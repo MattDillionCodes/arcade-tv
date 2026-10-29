@@ -16,7 +16,7 @@ import kotlin.math.max
 
 /**
  * A wallpaper is chosen by file name, looked up in two places:
- *  - your own photos in  /sdcard/Android/data/com.matthew.arcade/files/wallpapers/  (the phone
+ *  - your own photos in  /sdcard/Android/data/io.github.mattdillioncodes.arcade/files/wallpapers/  (the phone
  *    upload in [WallpaperDrop] saves there; `adb push` works too), then
  *  - the six built into the app, in  assets/wallpapers/  (1920x1080 sRGB JPEG, the cheapest to draw).
  */

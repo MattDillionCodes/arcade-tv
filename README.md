@@ -31,7 +31,7 @@ and **Developer options → USB / network debugging** turned on on the TV.
 adb connect <tv-ip>:5555
 curl -LO https://github.com/MattDillionCodes/arcade-tv/releases/latest/download/arcade-tv.apk
 adb install arcade-tv.apk
-adb shell cmd package set-home-activity com.matthew.arcade/.HomeActivity
+adb shell cmd package set-home-activity io.github.mattdillioncodes.arcade/com.matthew.arcade.HomeActivity
 adb shell input keyevent KEYCODE_HOME
 ```
 
@@ -41,7 +41,7 @@ Each release also has `arcade-tv.apk.sha256` so you can check the download:
 ### Undo
 
 ```bash
-adb uninstall com.matthew.arcade
+adb uninstall io.github.mattdillioncodes.arcade
 ```
 
 The TV goes back to its own home screen. (If it ever shows a blank screen instead, run

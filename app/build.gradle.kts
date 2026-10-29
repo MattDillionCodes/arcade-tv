@@ -8,7 +8,7 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.matthew.arcade"
+        applicationId = "io.github.mattdillioncodes.arcade"
         minSdk = 28 // Android TV 9+, as promised on the showcase page
         targetSdk = 35
         versionCode = 100

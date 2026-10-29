@@ -13,6 +13,6 @@ if [[ -n $TV ]]; then
   export ANDROID_SERIAL=$TV
 fi
 $ADB install -r app/build/outputs/apk/release/app-release.apk
-$ADB shell cmd package set-home-activity com.matthew.arcade/.HomeActivity >/dev/null
+$ADB shell cmd package set-home-activity io.github.mattdillioncodes.arcade/com.matthew.arcade.HomeActivity >/dev/null
 $ADB shell input keyevent KEYCODE_HOME
 echo "Arcade is Home."
