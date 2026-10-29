@@ -30,10 +30,11 @@ object Apps {
  * How an app's art sits on its tile, worked out once from its banner (or icon if it has none):
  *  - [background] set: the art's edges are one flat colour, so the tile takes that colour and the
  *    art blends into it, like the branded tiles third-party apps had on Windows Phone 8.1.
- *  - [fill]: the edges are a photo (too varied to extend), so the art covers the whole tile.
+ *  - [backdrop] set: the edges vary (a photo, a gradient), so no one colour can extend them. The
+ *    whole banner sits over a soft, stretched-out copy of itself instead: nothing gets cropped.
  *  - neither: the edges are see-through, so the art floats on the tile's accent colour.
  */
-class Look(val art: Drawable, val isBanner: Boolean, val background: Int?, val fill: Boolean) {
+class Look(val art: Drawable, val isBanner: Boolean, val background: Int?, val backdrop: Bitmap?) {
     companion object {
         private const val W = 64
         private const val H = 36
@@ -50,16 +51,18 @@ class Look(val art: Drawable, val isBanner: Boolean, val background: Int?, val f
                 for (x in 0 until w) { px[i++] = bmp.getPixel(x, 0); px[i++] = bmp.getPixel(x, H - 1) }
                 for (y in 0 until H) { px[i++] = bmp.getPixel(0, y); px[i++] = bmp.getPixel(w - 1, y) }
             }
+            // 12x7 pixels, stretched over a whole tile with filtering, reads as a heavy blur.
+            val tiny = if (isBanner) Bitmap.createScaledBitmap(bmp, 12, 7, true) else null
             bmp.recycle()
             val opaque = edge.filter { Color.alpha(it) >= 200 }
-            if (opaque.size < edge.size * 3 / 4) return Look(art, isBanner, background = null, fill = false)
+            if (opaque.size < edge.size * 3 / 4) return Look(art, isBanner, background = null, backdrop = null)
             val r = opaque.sumOf { Color.red(it) } / opaque.size
             val g = opaque.sumOf { Color.green(it) } / opaque.size
             val b = opaque.sumOf { Color.blue(it) } / opaque.size
             // Mean distance from the average colour: near 0 for a flat background, large for a photo.
             val spread = opaque.sumOf { abs(Color.red(it) - r) + abs(Color.green(it) - g) + abs(Color.blue(it) - b) } / opaque.size
-            return if (spread > 36) Look(art, isBanner, background = null, fill = isBanner)
-            else Look(art, isBanner, background = Color.rgb(r, g, b), fill = false)
+            return if (spread > 36) Look(art, isBanner, background = null, backdrop = tiny)
+            else Look(art, isBanner, background = Color.rgb(r, g, b), backdrop = null)
         }
     }
 }

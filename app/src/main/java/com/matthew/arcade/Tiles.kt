@@ -65,9 +65,21 @@ open class Tile(context: Context, val size: TileSize) : FrameLayout(context) {
         invalidate()
     }
 
+    /** For tiles whose art already shows the name: the label appears only while focused. */
+    var labelOnFocus = false
+        set(v) { field = v; syncLabel() }
+
     fun setLabel(s: String?) {
         label.text = s ?: ""
-        label.visibility = if (s == null) GONE else VISIBLE
+        syncLabel()
+    }
+
+    private fun syncLabel() {
+        label.visibility = when {
+            label.text.isEmpty() -> GONE
+            labelOnFocus && !isFocused -> INVISIBLE
+            else -> VISIBLE
+        }
     }
 
     override fun onDraw(c: Canvas) {
@@ -96,6 +108,7 @@ open class Tile(context: Context, val size: TileSize) : FrameLayout(context) {
 
     override fun onFocusChanged(gainFocus: Boolean, direction: Int, previouslyFocusedRect: android.graphics.Rect?) {
         super.onFocusChanged(gainFocus, direction, previouslyFocusedRect)
+        syncLabel()
         settle()
         invalidate()
     }

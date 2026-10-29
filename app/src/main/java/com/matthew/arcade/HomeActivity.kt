@@ -211,24 +211,33 @@ class HomeActivity : Activity(), ControlPanel.Host {
         setLabel(app.label)
         val look = app.look
         val art = ImageView(context).apply { setImageDrawable(look.art) }
-        val labelRoom = dp(if (size == TileSize.LARGE) 36 else 26)
+        val backdrop = look.backdrop
+        // Opaque banners carry the app's own name or logo, so a permanent label would repeat it
+        // (or sit on top of it): theirs only appears while the tile is focused.
+        labelOnFocus = look.background != null || backdrop != null
+        art.scaleType = ImageView.ScaleType.FIT_CENTER
         when {
-            look.fill -> {
-                art.scaleType = ImageView.ScaleType.CENTER_CROP
-                addView(art, 0, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
-                // A dark fade under the name so it reads over any photo.
+            backdrop != null -> {
+                // The whole banner, never cropped, over a blurred stretch of itself.
+                addView(ImageView(context).apply {
+                    setImageBitmap(backdrop)
+                    // Undimmed, so it meets the banner's own edges without a visible seam.
+                    scaleType = ImageView.ScaleType.CENTER_CROP
+                }, 0, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
+                addView(art, 1, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
+                // A dark fade under the name for when it shows.
                 addView(View(context).apply {
                     background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                        intArrayOf(Color.TRANSPARENT, Color.argb(170, 0, 0, 0)))
-                }, 1, FrameLayout.LayoutParams(MATCH_PARENT, dp(48), Gravity.BOTTOM))
+                        intArrayOf(Color.TRANSPARENT, Color.argb(150, 0, 0, 0)))
+                }, 2, FrameLayout.LayoutParams(MATCH_PARENT, dp(40), Gravity.BOTTOM))
             }
+            // Blended: the tile is the banner's own background colour, so it runs edge to edge.
+            look.background != null -> addView(art, 0, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
             look.isBanner -> {
-                // Blended banners run edge to edge (the tile is their own background colour);
-                // see-through ones get a margin so they sit on the accent like a card.
-                art.scaleType = ImageView.ScaleType.FIT_CENTER
-                val inset = if (look.background != null) 0 else dp(if (size == TileSize.LARGE) 20 else 8)
+                // See-through banners sit on the accent like a card, above their (always shown) name.
+                val inset = dp(if (size == TileSize.LARGE) 20 else 8)
                 addView(art, 0, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT).apply {
-                    setMargins(inset, inset, inset, labelRoom)
+                    setMargins(inset, inset, inset, dp(if (size == TileSize.LARGE) 36 else 26))
                 })
             }
             else -> {
@@ -261,7 +270,7 @@ class HomeActivity : Activity(), ControlPanel.Host {
             val own = app?.let { prefs.tileColor(it.key) ?: it.look.background }
             tile.color = own ?: prefs.accent
             // As on WP 8.1, only accent tiles become windows onto the photo; branded ones keep their colour.
-            tile.photo = if (own == null && app?.look?.fill != true) photo else null
+            tile.photo = if (own == null && app?.look?.backdrop == null) photo else null
         }
     }
 
