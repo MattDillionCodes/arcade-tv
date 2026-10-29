@@ -54,7 +54,7 @@ class WallpaperDrop(
     private val url = activity.text("", 14f, Metro.regular, Metro.dimText)
     private val hint = activity.text("", 13f, Metro.regular, Metro.dimText)
     private val status = activity.text("", 20f)
-    private val done = button("done")
+    private val done = button("Done")
 
     val view = FrameLayout(activity).apply {
         setBackgroundColor(Color.argb(245, 0, 0, 0))
@@ -65,12 +65,12 @@ class WallpaperDrop(
             setPadding(dp(72), dp(48), dp(72), dp(48))
             addView(LinearLayout(activity).apply {
                 orientation = LinearLayout.VERTICAL
-                addView(activity.text("wallpaper", 64f))
-                addView(activity.text("from your phone", 22f, color = Metro.dimText))
+                addView(activity.text("Wallpaper", 64f))
+                addView(activity.text("From Your Phone", 22f, color = Metro.dimText))
                 listOf(
-                    "point your phone's camera at the code",
-                    "open the link and choose photos",
-                    "they appear here, cropped for your tv",
+                    "Point Your Phone's Camera At The Code",
+                    "Open The Link And Choose Photos",
+                    "They Appear Here, Cropped For Your TV",
                 ).forEachIndexed { i, step ->
                     addView(LinearLayout(activity).apply {
                         addView(activity.text("${i + 1}", 20f).also { it.minWidth = dp(28) })
@@ -100,13 +100,13 @@ class WallpaperDrop(
         val link = if (port == null || ip == null) null else "http://$ip:$port/$token"
         status.setTextColor(Color.WHITE)
         status.text = when {
-            port == null -> "couldn't start the upload server"
-            ip == null -> "connect the tv to wi-fi or ethernet first"
-            else -> "waiting for photos…"
+            port == null -> "Couldn't Start The Upload Server"
+            ip == null -> "Connect The TV To Wi-Fi Or Ethernet First"
+            else -> "Waiting For Photos…"
         }
         url.text = link ?: ""
         // Emulators sit behind NAT (10.0.2.15): a phone can't reach them, the host can via adb.
-        hint.text = if (port != null && isEmulator()) "emulator: adb forward tcp:$port tcp:$port, then open localhost:$port/$token" else ""
+        hint.text = if (port != null && isEmulator()) "Emulator: adb forward tcp:$port tcp:$port, Then Open localhost:$port/$token" else ""
         qr.setImageBitmap(link?.let { qrBitmap(it, dp(280)) })
         view.visibility = View.VISIBLE
         view.alpha = 0f
@@ -180,7 +180,7 @@ class WallpaperDrop(
                 activity.runOnUiThread {
                     received++
                     status.setTextColor(accent())
-                    status.text = if (received == 1) "got it — that's your wallpaper now" else "got $received photos"
+                    status.text = if (received == 1) "Got It — That's Your Wallpaper Now" else "Got $received Photos"
                     onPhoto(file)
                 }
             }
@@ -280,7 +280,7 @@ class WallpaperDrop(
         private fun page(accent: Int): String {
             val hex = String.format("#%06X", accent and 0xFFFFFF)
             return """<!doctype html><html><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1"><title>arcade · wallpaper</title>
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Arcade · Wallpaper</title>
 <style>
 body{margin:0;background:#000;color:#fff;font-family:"Segoe UI",-apple-system,Roboto,sans-serif;padding:32px 22px}
 h1{font-weight:200;font-size:58px;margin:0;letter-spacing:-1px}
@@ -293,14 +293,14 @@ input{display:none}
 #list span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#ccc}
 .ok{color:$hex}.err{color:#E51400}
 </style></head><body>
-<h1>wallpaper</h1><p>for arcade on your tv</p>
-<label><input id="f" type="file" accept="image/*" multiple>choose photos<small>cropped to 1920×1080 on this phone</small></label>
+<h1>Wallpaper</h1><p>For Arcade On Your TV</p>
+<label><input id="f" type="file" accept="image/*" multiple>Choose Photos<small>Cropped To 1920×1080 On This Phone</small></label>
 <div id="list"></div>
 <script>
 const W=1920,H=1080,f=document.getElementById('f'),list=document.getElementById('list');
 f.onchange=async()=>{
   for(const file of f.files){
-    const row=document.createElement('div');row.innerHTML='<span></span><b>sizing…</b>';
+    const row=document.createElement('div');row.innerHTML='<span></span><b>Sizing…</b>';
     row.firstChild.textContent=file.name;list.prepend(row);const st=row.lastChild;
     try{
       const img=await createImageBitmap(file);
@@ -308,11 +308,11 @@ f.onchange=async()=>{
       const s=Math.max(W/img.width,H/img.height),w=img.width*s,h=img.height*s,g=c.getContext('2d');
       g.imageSmoothingQuality='high';g.drawImage(img,(W-w)/2,(H-h)/2,w,h);
       const blob=await new Promise(r=>c.toBlob(r,'image/jpeg',0.85));
-      st.textContent='sending…';
+      st.textContent='Sending…';
       const res=await fetch(location.pathname+'/upload',{method:'POST',body:blob,headers:{'Content-Type':'image/jpeg'}});
       if(!res.ok)throw new Error(res.status);
-      st.textContent='on your tv';st.className='ok';
-    }catch(e){st.textContent='failed';st.className='err';}
+      st.textContent='On Your TV';st.className='ok';
+    }catch(e){st.textContent='Failed';st.className='err';}
   }
   f.value='';
 };

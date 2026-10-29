@@ -37,7 +37,7 @@ class AppMenu(private val activity: Activity, private val onClosed: () -> Unit) 
     fun show(name: String, items: List<MenuItem>) {
         generation++
         view.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
-        title.text = name.lowercase()
+        title.text = name
         row.removeAllViews()
         items.forEachIndexed { i, item ->
             row.addView(option(item), LinearLayout.LayoutParams(

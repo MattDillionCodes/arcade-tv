@@ -10,8 +10,9 @@ TV=192.168.68.52:5555 ./install.sh  # a TV over ADB Wi-Fi
 
 ## What's on screen
 
-- **Panorama**: two sections, *start* and *apps*, under a huge lowercase title that scrolls at a
-  third of the content's speed. Moving into *apps* snaps the whole section into view.
+- **Panorama**: two sections, *Start* and *Apps*, under a time-of-day greeting and the date that
+  scroll at a third of the content's speed. Moving into *Apps* snaps the whole section into view.
+  Every caption is in Title Case.
 - **Start**: tiles flow column by column into a 4-row grid (small 1x1, medium 2x2, wide 4x2,
   large 4x4), Windows Phone style.
   - **Hero tile** (large): the pinned app, or `pickHero()` in `Apps.kt` decides.

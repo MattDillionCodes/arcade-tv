@@ -90,12 +90,12 @@ class HomeActivity : Activity(), ControlPanel.Host {
             setFadingEdgeLength(dp(24))
             addView(appsGrid)
         }
-        appsSection = section("apps", appsScroll, LinearLayout.LayoutParams(dp(APP_W * 3 + 48), dp(300)))
+        appsSection = section("Apps", appsScroll, LinearLayout.LayoutParams(dp(APP_W * 3 + 48), dp(300)))
         val content = LinearLayout(this).apply {
             clipChildren = false
             clipToPadding = false
             setPadding(dp(48), dp(8), dp(48), 0)
-            addView(section("start", startGrid, LinearLayout.LayoutParams(0, span(ROWS))))
+            addView(section("Start", startGrid, LinearLayout.LayoutParams(0, span(ROWS))))
             addView(appsSection, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply { marginStart = dp(72) })
         }
         panorama = Panorama(this, appsSection).apply {
@@ -129,7 +129,7 @@ class HomeActivity : Activity(), ControlPanel.Host {
                 addView(clock)
             }, FrameLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT, Gravity.TOP or Gravity.END).apply { topMargin = dp(34); rightMargin = dp(48) })
             addView(panorama, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT).apply { topMargin = dp(118) })
-            addView(text("▲ action center     hold OK for options     ☰ menu", 13f, Metro.regular, Color.argb(110, 255, 255, 255)),
+            addView(text("▲ Action Center     Hold OK For Options     ☰ Menu", 13f, Metro.regular, Color.argb(110, 255, 255, 255)),
                 FrameLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT, Gravity.BOTTOM or Gravity.START).apply { leftMargin = dp(48); bottomMargin = dp(22) })
             addView(controls.view, FrameLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT, Gravity.TOP))
             addView(menu.view, FrameLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT, Gravity.BOTTOM))
@@ -330,7 +330,7 @@ class HomeActivity : Activity(), ControlPanel.Host {
         val pins = pinned(hero).map { it.key }.toMutableList()
         val index = pins.indexOf(app.key)
         val items = mutableListOf<MenuItem>()
-        if (!isHero) items += MenuItem("make hero") {
+        if (!isHero) items += MenuItem("Make Hero") {
             // The old hero keeps a place on Start rather than vanishing.
             hero?.let { if (it.key !in pins) pins.add(0, it.key) }
             pins.remove(app.key)
@@ -339,20 +339,20 @@ class HomeActivity : Activity(), ControlPanel.Host {
             returnTag = "hero"
             buildStart()
         }
-        if (isHero && prefs.hero != null) items += MenuItem("let arcade choose") {
+        if (isHero && prefs.hero != null) items += MenuItem("Let Arcade Choose") {
             prefs.hero = null
             buildStart()
         }
-        items += MenuItem("colour") { colourMenu(app) }
-        if (index > 0) items += MenuItem("move left") { move(pins, index, -1) }
-        if (index in 0 until pins.size - 1) items += MenuItem("move right") { move(pins, index, 1) }
+        items += MenuItem("Colour") { colourMenu(app) }
+        if (index > 0) items += MenuItem("Move Left") { move(pins, index, -1) }
+        if (index in 0 until pins.size - 1) items += MenuItem("Move Right") { move(pins, index, 1) }
         when {
-            index >= 0 -> items += MenuItem("unpin") {
+            index >= 0 -> items += MenuItem("Unpin") {
                 pins.removeAt(index)
                 prefs.pins = pins
                 buildStart()
             }
-            !isHero -> items += MenuItem("pin to start") {
+            !isHero -> items += MenuItem("Pin To Start") {
                 pins += app.key
                 prefs.pins = pins
                 returnTag = "app:${app.key}"
@@ -376,8 +376,8 @@ class HomeActivity : Activity(), ControlPanel.Host {
             applyTileLook()
             buildAppList()
         }
-        menu.show("${app.label} · colour",
-            listOf(MenuItem("original") { pick(null) }) + Metro.accents.map { c -> MenuItem("", c) { pick(c) } })
+        menu.show("${app.label} · Colour",
+            listOf(MenuItem("Original") { pick(null) }) + Metro.accents.map { c -> MenuItem("", c) { pick(c) } })
     }
 
     // --- overlays ------------------------------------------------------------------------------
@@ -451,7 +451,7 @@ class HomeActivity : Activity(), ControlPanel.Host {
     override fun nextWallpaper() {
         val photos = Wallpapers.photos(this)
         if (photos.isEmpty()) {
-            showToast("no photos yet — send some from your phone")
+            showToast("No Photos Yet — Send Some From Your Phone")
             return
         }
         val i = photos.indexOfFirst { it.name == prefs.wallpaper }
@@ -487,11 +487,11 @@ class HomeActivity : Activity(), ControlPanel.Host {
         val now = LocalDateTime.now()
         clock.text = now.format(DateTimeFormatter.ofPattern("h:mm"))
         greeting.text = when (now.hour) {
-            in 5..11 -> "good morning"
-            in 12..16 -> "good afternoon"
-            else -> "good evening"
+            in 5..11 -> "Good Morning"
+            in 12..16 -> "Good Afternoon"
+            else -> "Good Evening"
         }
-        date.text = now.format(DateTimeFormatter.ofPattern("EEEE, MMMM d")).lowercase()
+        date.text = now.format(DateTimeFormatter.ofPattern("EEEE, MMMM d"))
         clockTile.tick()
     }
 

@@ -167,24 +167,24 @@ open class LiveTile(context: Context, size: TileSize) : Tile(context, size) {
 /** Wide weather tile: now, then turns over to the next three days. */
 class WeatherTile(context: Context) : LiveTile(context, TileSize.WIDE) {
     private val glyph = WeatherGlyph(context)
-    private val temp = context.text("", 52f)
-    private val summary = context.text("loading…", 18f)
+    private val temp = context.text("", 46f)
+    private val summary = context.text("Loading…", 18f)
     private var loaded = false
     private val feels = context.text("", 13f, Metro.regular, Color.argb(200, 255, 255, 255)).apply { maxLines = 1 }
     private val dayRow = LinearLayout(context)
 
     init {
-        setLabel("weather · ${Weather.PLACE}")
+        setLabel("Weather · ${Weather.PLACE}")
         addFace(LinearLayout(context).apply {
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(16), dp(10), dp(14), dp(28))
-            addView(glyph, LinearLayout.LayoutParams(dp(56), dp(56)))
-            addView(temp, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply { marginStart = dp(12) })
+            addView(glyph, LinearLayout.LayoutParams(dp(46), dp(46)))
+            addView(temp, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply { marginStart = dp(8) })
             addView(LinearLayout(context).apply {
                 orientation = LinearLayout.VERTICAL
                 addView(summary)
                 addView(feels, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply { topMargin = dp(4) })
-            }, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f).apply { marginStart = dp(14) })
+            }, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f).apply { marginStart = dp(10) })
         })
         addFace(dayRow.apply { setPadding(dp(10), dp(12), dp(10), dp(28)) })
         // Until the first forecast: just the caption, no made-up sun or "--°".
@@ -199,7 +199,7 @@ class WeatherTile(context: Context) : LiveTile(context, TileSize.WIDE) {
 
     /** A fetch failed before we ever had data (no network yet, e.g. right after boot). */
     fun failed() {
-        if (!loaded) summary.text = "waiting for network…"
+        if (!loaded) summary.text = "Waiting For Network…"
     }
 
     fun bind(w: Weather) {
@@ -209,13 +209,13 @@ class WeatherTile(context: Context) : LiveTile(context, TileSize.WIDE) {
         glyph.sky = w.sky
         temp.text = "${w.temp}°"
         summary.text = w.summary
-        feels.text = "feels like ${w.feels}°"
+        feels.text = "Feels Like ${w.feels}°"
         dayRow.removeAllViews()
         w.days.drop(1).take(3).forEach { d ->
             dayRow.addView(LinearLayout(context).apply {
                 orientation = LinearLayout.VERTICAL
                 gravity = Gravity.CENTER_HORIZONTAL
-                addView(context.text(d.date.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault()).lowercase(), 15f))
+                addView(context.text(d.date.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault()), 15f))
                 addView(WeatherGlyph(context).apply { sky = d.sky },
                     LinearLayout.LayoutParams(dp(30), dp(30)).apply { setMargins(0, dp(5), 0, dp(5)) })
                 addView(context.text("${d.hi}°  ${d.lo}°", 14f, Metro.regular))
@@ -249,9 +249,9 @@ class ClockTile(context: Context) : LiveTile(context, TileSize.MEDIUM) {
     fun tick() {
         val now = LocalDateTime.now()
         time.text = now.format(DateTimeFormatter.ofPattern("h:mm"))
-        weekday.text = now.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.getDefault()).lowercase()
+        weekday.text = now.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.getDefault())
         dayNumber.text = now.dayOfMonth.toString()
-        month.text = now.month.getDisplayName(TextStyle.FULL, Locale.getDefault()).lowercase()
+        month.text = now.month.getDisplayName(TextStyle.FULL, Locale.getDefault())
     }
 }
 

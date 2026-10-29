@@ -88,7 +88,7 @@ class ControlPanel(private val activity: Activity, private val prefs: Prefs, pri
             addView(activity.text(now.format(DateTimeFormatter.ofPattern("h:mm")), 54f))
             addView(LinearLayout(activity).apply {
                 orientation = LinearLayout.VERTICAL
-                addView(activity.text(now.format(DateTimeFormatter.ofPattern("EEEE, MMMM d")).lowercase(), 18f))
+                addView(activity.text(now.format(DateTimeFormatter.ofPattern("EEEE, MMMM d")), 18f))
                 host.weather?.let { addView(activity.text("${it.temp}° ${it.summary} · ${Weather.PLACE}", 15f, Metro.regular, Metro.dimText)) }
             }, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply { marginStart = dp(18); topMargin = dp(10) })
         })
@@ -101,13 +101,13 @@ class ControlPanel(private val activity: Activity, private val prefs: Prefs, pri
         columns.addView(right, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f).apply { marginStart = dp(40) })
 
         // Left: what you'd reach for most.
-        section(left, "quick actions")
+        section(left, "Quick Actions")
         left.addView(row(listOf(
-            "network" to Settings.ACTION_WIFI_SETTINGS,
-            "bluetooth" to Settings.ACTION_BLUETOOTH_SETTINGS,
-            "display" to Settings.ACTION_DISPLAY_SETTINGS,
-            "sound" to Settings.ACTION_SOUND_SETTINGS,
-            "settings" to Settings.ACTION_SETTINGS,
+            "Network" to Settings.ACTION_WIFI_SETTINGS,
+            "Bluetooth" to Settings.ACTION_BLUETOOTH_SETTINGS,
+            "Display" to Settings.ACTION_DISPLAY_SETTINGS,
+            "Sound" to Settings.ACTION_SOUND_SETTINGS,
+            "Settings" to Settings.ACTION_SETTINGS,
         ).mapIndexed { i, (name, action) ->
             Tile(activity, TileSize.SMALL).apply {
                 tag = "q:$i"
@@ -119,17 +119,17 @@ class ControlPanel(private val activity: Activity, private val prefs: Prefs, pri
             }
         }, gap = 8))
 
-        section(left, "volume")
+        section(left, "Volume")
         left.addView(VolumeBar(accent).apply { tag = "volume" }, LinearLayout.LayoutParams(MATCH_PARENT, dp(36)))
 
         val inputs = inputChips()
         if (inputs.isNotEmpty()) {
-            section(left, "inputs")
+            section(left, "Inputs")
             left.addView(row(inputs))
         }
 
         // Right: how Arcade looks.
-        section(right, "accent colour")
+        section(right, "Accent Colour")
         right.addView(LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             clipChildren = false
@@ -144,20 +144,20 @@ class ControlPanel(private val activity: Activity, private val prefs: Prefs, pri
             }
         })
 
-        section(right, "tiles")
+        section(right, "Tiles")
         right.addView(row(listOf(false, true).map { photo ->
-            chip(if (photo) "photo" else "solid", "tiles:$photo", selected = prefs.photoTiles == photo, accent) {
+            chip(if (photo) "Photo" else "Solid", "tiles:$photo", selected = prefs.photoTiles == photo, accent) {
                 prefs.photoTiles = photo
                 host.photoTilesChanged()
                 build()
             }
         }))
 
-        section(right, "wallpaper")
+        section(right, "Wallpaper")
         right.addView(row(listOf(
-            chip("from phone", "wp:phone", false, accent) { host.wallpaperFromPhone() },
-            chip("next", "wp:next", false, accent) { host.nextWallpaper() },
-            chip("default", "wp:default", prefs.wallpaper == null, accent) { host.defaultWallpaper(); build() },
+            chip("From Phone", "wp:phone", false, accent) { host.wallpaperFromPhone() },
+            chip("Next", "wp:next", false, accent) { host.nextWallpaper() },
+            chip("Default", "wp:default", prefs.wallpaper == null, accent) { host.defaultWallpaper(); build() },
         )))
 
         focusedTag?.let { tag -> content.post { content.findViewWithTag<View>(tag)?.requestFocus() } }
@@ -169,7 +169,7 @@ class ControlPanel(private val activity: Activity, private val prefs: Prefs, pri
         return all.filter { it.type == TvInputInfo.TYPE_HDMI && it.parentId == null }
             .sortedBy { it.loadLabel(activity).toString() }
             .map { port ->
-                val name = (port.loadCustomLabel(activity) ?: port.loadLabel(activity)).toString().lowercase()
+                val name = (port.loadCustomLabel(activity) ?: port.loadLabel(activity)).toString()
                 chip(name, "in:${port.id}", false, prefs.accent) {
                     // TCL's player only matches VIEW with the channel MIME type attached.
                     runCatching {

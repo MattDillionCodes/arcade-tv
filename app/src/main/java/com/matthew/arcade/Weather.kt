@@ -34,7 +34,7 @@ class Day(val date: LocalDate, val hi: Int, val lo: Int, val sky: Sky)
 /** Current conditions and the next few days from Open-Meteo (free, no API key). */
 class Weather(val temp: Int, val feels: Int, val sky: Sky, val summary: String, val days: List<Day>) {
     companion object {
-        const val PLACE = "los angeles"
+        const val PLACE = "Los Angeles"
         private const val URL = "https://api.open-meteo.com/v1/forecast?latitude=34.0522&longitude=-118.2437" +
             "&current=temperature_2m,apparent_temperature,weather_code,is_day" +
             "&daily=weather_code,temperature_2m_max,temperature_2m_min&forecast_days=4" +
@@ -74,19 +74,19 @@ class Weather(val temp: Int, val feels: Int, val sky: Sky, val summary: String, 
             else -> Sky.CLOUD
         }
 
-        /** Lowercase, like every caption on Windows Phone. */
+        /** Title Case, like every other caption in Arcade. */
         private fun summary(code: Int) = when (code) {
-            0 -> "clear"
-            1 -> "mostly clear"
-            2 -> "partly cloudy"
-            3 -> "cloudy"
-            45, 48 -> "fog"
-            in 51..57 -> "drizzle"
-            in 61..67 -> "rain"
-            in 71..77 -> "snow"
-            in 80..82 -> "showers"
-            85, 86 -> "snow showers"
-            in 95..99 -> "thunderstorms"
+            0 -> "Clear"
+            1 -> "Mostly Clear"
+            2 -> "Partly Cloudy"
+            3 -> "Cloudy"
+            45, 48 -> "Fog"
+            in 51..57 -> "Drizzle"
+            in 61..67 -> "Rain"
+            in 71..77 -> "Snow"
+            in 80..82 -> "Showers"
+            85, 86 -> "Snow Showers"
+            in 95..99 -> "Thunderstorms"
             else -> "—"
         }
     }
