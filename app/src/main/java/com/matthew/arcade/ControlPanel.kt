@@ -60,6 +60,12 @@ class ControlPanel(private val activity: Activity, private val prefs: Prefs, pri
     }
     var isOpen = false
         private set
+    private var clock: TextView? = null
+
+    /** Every minute while open, so the panel's clock never lags the one behind it. */
+    fun tick() {
+        if (isOpen) clock?.text = LocalDateTime.now().format(activity.clockFormat())
+    }
 
     fun open() {
         if (isOpen) return
@@ -89,7 +95,7 @@ class ControlPanel(private val activity: Activity, private val prefs: Prefs, pri
 
         val now = LocalDateTime.now()
         content.addView(LinearLayout(activity).apply {
-            addView(activity.text(now.format(activity.clockFormat()), 54f))
+            addView(activity.text(now.format(activity.clockFormat()), 54f).also { clock = it })
             addView(LinearLayout(activity).apply {
                 orientation = LinearLayout.VERTICAL
                 addView(activity.text(now.format(DateTimeFormatter.ofPattern("EEEE, MMMM d")), 18f))
@@ -169,7 +175,7 @@ class ControlPanel(private val activity: Activity, private val prefs: Prefs, pri
         section(right, "Wallpaper")
         right.addView(row(listOf(
             chip("From Phone", "wp:phone", false, accent) { host.wallpaperFromPhone() },
-            chip("Next", "wp:next", false, accent) { host.nextWallpaper() },
+            chip("Next", "wp:next", false, accent) { host.nextWallpaper(); build() }, // Default no longer selected
             chip("Default", "wp:default", prefs.wallpaper == null, accent) { host.defaultWallpaper(); build() },
         )))
 

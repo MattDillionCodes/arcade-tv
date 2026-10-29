@@ -626,6 +626,7 @@ class HomeActivity : Activity(), ControlPanel.Host {
 
     private fun tick() {
         lock.tick()
+        controls.tick()
         val now = LocalDateTime.now()
         clock.text = now.format(clockFormat())
         greeting.text = when (now.hour) {
