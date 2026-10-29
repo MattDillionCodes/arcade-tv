@@ -11,6 +11,7 @@ import android.net.ConnectivityManager
 import android.os.Build
 import android.view.Gravity
 import android.view.View
+import android.view.ViewGroup
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
 import android.widget.FrameLayout
@@ -91,6 +92,7 @@ class WallpaperDrop(
     fun open() {
         if (isOpen) return
         isOpen = true
+        view.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
         token = newToken()
         received = 0
         val port = startServer()
@@ -116,6 +118,8 @@ class WallpaperDrop(
     fun close() {
         if (!isOpen) return
         isOpen = false
+        // Closing (or closed) overlays never take focus, even mid-animation while still on screen.
+        view.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
         runCatching { server?.close() }
         server = null
         view.animate().alpha(0f).translationY(dp(40).toFloat()).setInterpolator(Metro.easeIn).setDuration(200)

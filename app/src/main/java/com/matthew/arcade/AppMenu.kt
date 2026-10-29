@@ -5,6 +5,7 @@ import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.View
+import android.view.ViewGroup
 import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -35,6 +36,7 @@ class AppMenu(private val activity: Activity, private val onClosed: () -> Unit) 
 
     fun show(name: String, items: List<MenuItem>) {
         generation++
+        view.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
         title.text = name.lowercase()
         row.removeAllViews()
         items.forEachIndexed { i, item ->
@@ -61,6 +63,8 @@ class AppMenu(private val activity: Activity, private val onClosed: () -> Unit) 
     fun close() {
         if (!isOpen) return
         isOpen = false
+        // Closing (or closed) overlays never take focus, even mid-animation while still on screen.
+        view.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
         view.animate().translationY(view.height.toFloat()).setInterpolator(Metro.easeIn).setDuration(180)
             .withEndAction { if (!isOpen) view.visibility = View.GONE }.start()
         onClosed()

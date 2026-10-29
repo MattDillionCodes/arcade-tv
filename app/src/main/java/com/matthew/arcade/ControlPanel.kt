@@ -60,6 +60,7 @@ class ControlPanel(private val activity: Activity, private val prefs: Prefs, pri
     fun open() {
         if (isOpen) return
         isOpen = true
+        view.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
         build()
         view.visibility = View.VISIBLE
         view.translationY = -dp(420).toFloat()
@@ -70,6 +71,8 @@ class ControlPanel(private val activity: Activity, private val prefs: Prefs, pri
     fun close() {
         if (!isOpen) return
         isOpen = false
+        // Closing (or closed) overlays never take focus, even mid-animation while still on screen.
+        view.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
         view.animate().translationY(-view.height.toFloat()).setInterpolator(Metro.easeIn).setDuration(220)
             .withEndAction { view.visibility = View.GONE }.start()
     }

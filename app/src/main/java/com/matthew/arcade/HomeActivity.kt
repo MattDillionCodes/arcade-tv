@@ -574,6 +574,12 @@ class HomeActivity : Activity(), ControlPanel.Host {
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        // With nothing open, focus belongs on the home screen. If it's anywhere else (or nowhere),
+        // this press only brings the focus ring back, so you never press into the invisible.
+        if (event.action == KeyEvent.ACTION_DOWN && !anyOverlay() && !inPanorama(currentFocus)) {
+            restoreFocus()
+            return true
+        }
         if (event.action == KeyEvent.ACTION_DOWN) when (event.keyCode) {
             KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_BUTTON_Y -> {
                 if (controls.isOpen) closeControls() else openControls()
@@ -591,6 +597,15 @@ class HomeActivity : Activity(), ControlPanel.Host {
             }
         }
         return super.dispatchKeyEvent(event)
+    }
+
+    private fun inPanorama(v: View?): Boolean {
+        var node: Any? = v
+        while (node is View) {
+            if (node === panorama) return true
+            node = node.parent
+        }
+        return false
     }
 
     private fun atTop(v: View?): Boolean = when {

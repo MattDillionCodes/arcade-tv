@@ -9,6 +9,7 @@ import android.graphics.RectF
 import android.text.TextUtils
 import android.view.Gravity
 import android.view.View
+import android.view.ViewOutlineProvider
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
 import android.widget.FrameLayout
@@ -24,7 +25,7 @@ enum class TileSize(val cols: Int, val rows: Int) { SMALL(1, 1), MEDIUM(2, 2), W
 
 /**
  * A Metro tile: a flat square of colour, or (photo mode) a window onto the wallpaper behind
- * Start. Label bottom-left, a white frame while focused, and the Windows Phone "tilt" when pressed.
+ * Start. Label bottom-left, a focus ring around it, and the Windows Phone "tilt" when pressed.
  */
 open class Tile(context: Context, val size: TileSize) : FrameLayout(context) {
     var color = Metro.defaultAccent
@@ -41,7 +42,8 @@ open class Tile(context: Context, val size: TileSize) : FrameLayout(context) {
         maxLines = 1
         ellipsize = TextUtils.TruncateAt.END
     }
-    private val frame = Paint().apply { style = Paint.Style.STROKE; color = Color.WHITE; strokeWidth = dp(3).toFloat() }
+    private val ring = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; color = Color.WHITE; strokeWidth = dp(4).toFloat() }
+    private val halo = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; color = Color.argb(140, 0, 0, 0); strokeWidth = dp(2).toFloat() }
     private val scrim = Paint().apply { color = Color.argb(80, 0, 0, 0) }
     private val bitmapPaint = Paint(Paint.FILTER_BITMAP_FLAG)
     private val loc = IntArray(2)
@@ -52,16 +54,16 @@ open class Tile(context: Context, val size: TileSize) : FrameLayout(context) {
         isClickable = true
         isLongClickable = true
         defaultFocusHighlightEnabled = false
+        outlineProvider = ViewOutlineProvider.BOUNDS // so the lift casts a real shadow
         addView(label, LayoutParams(MATCH_PARENT, WRAP_CONTENT, Gravity.BOTTOM or Gravity.START).apply {
             setMargins(dp(8), 0, dp(8), dp(7))
         })
     }
 
-    /** White label and focus frame, or near-black ones on a light tile (e.g. Play Store's white banner). */
+    /** White label, or a near-black one on a light tile (e.g. Play Store's white banner). */
     private fun restyle() {
         val light = photo == null && Color.luminance(color) > 0.6f
         label.setTextColor(if (light) Color.argb(220, 0, 0, 0) else Color.WHITE)
-        frame.color = if (light) Color.argb(200, 0, 0, 0) else Color.WHITE
         invalidate()
     }
 
@@ -101,8 +103,12 @@ open class Tile(context: Context, val size: TileSize) : FrameLayout(context) {
     override fun dispatchDraw(c: Canvas) {
         super.dispatchDraw(c)
         if (isFocused) {
-            val inset = frame.strokeWidth / 2
-            c.drawRect(inset, inset, width - inset, height - inset, frame)
+            // A white ring just outside the tile (parents don't clip), edged with a dark halo so
+            // it reads on any tile colour and any wallpaper, rather than a line inside the art.
+            val r = dp(3) + ring.strokeWidth / 2
+            c.drawRect(-r, -r, width + r, height + r, ring)
+            val h = r + ring.strokeWidth / 2 + halo.strokeWidth / 2
+            c.drawRect(-h, -h, width + h, height + h, halo)
         }
     }
 
@@ -119,20 +125,14 @@ open class Tile(context: Context, val size: TileSize) : FrameLayout(context) {
         if (changed) settle()
     }
 
-    // Focus often lands before the first layout; settle again once the real size is known.
-    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
-        super.onSizeChanged(w, h, oldw, oldh)
-        settle()
-    }
-
-    /** Focused tiles lift ~6dp on every side (whatever their size); pressed ones tilt back into the screen. */
+    /** Focused tiles grow 8% and lift onto a shadow; pressed ones tilt back into the screen. */
     private fun settle() {
         val scale = when {
             isPressed -> 0.95f
-            isFocused && width > 0 -> 1f + dp(12) / width.toFloat()
+            isFocused -> 1.08f
             else -> 1f
         }
-        translationZ = if (isFocused) 2f else 0f
+        translationZ = if (isFocused) dp(10).toFloat() else 0f
         animate().scaleX(scale).scaleY(scale).setInterpolator(Metro.easeOut).setDuration(if (isPressed) 90 else 220).start()
     }
 }
