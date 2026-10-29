@@ -1,0 +1,71 @@
+# Push a tag like v1.0.0 → build the signed release APK → publish a GitHub Release with
+#   arcade-tv.apk          (same name every release, so .../releases/latest/download/arcade-tv.apk works)
+#   arcade-tv.apk.sha256   ("<sha256>  arcade-tv.apk", for the showcase site's install prompt to verify)
+# and the release notes taken from that version's section of CHANGELOG.md.
+#
+# Repo secrets it needs (Settings → Secrets and variables → Actions):
+#   ARCADE_KEYSTORE_BASE64    base64 of your release keystore (.jks)
+#   ARCADE_KEYSTORE_PASSWORD  its store password
+#   ARCADE_KEY_ALIAS          the key's alias
+#   ARCADE_KEY_PASSWORD       the key's password
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Check the tag matches versionName
+        run: |
+          want="${GITHUB_REF_NAME#v}"
+          have=$(sed -n 's/.*versionName = "\(.*\)".*/\1/p' app/build.gradle.kts)
+          if [ "$want" != "$have" ]; then echo "Tag $GITHUB_REF_NAME but versionName is $have"; exit 1; fi
+
+      - name: Restore the signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ARCADE_KEYSTORE_BASE64 }}
+        run: |
+          # Never publish a debug-signed build: stop if the key isn't set up.
+          if [ -z "$KEYSTORE_BASE64" ]; then echo "ARCADE_KEYSTORE_BASE64 secret is missing"; exit 1; fi
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+
+      - name: Build
+        env:
+          ARCADE_KEYSTORE: ${{ runner.temp }}/release.jks
+          ARCADE_KEYSTORE_PASSWORD: ${{ secrets.ARCADE_KEYSTORE_PASSWORD }}
+          ARCADE_KEY_ALIAS: ${{ secrets.ARCADE_KEY_ALIAS }}
+          ARCADE_KEY_PASSWORD: ${{ secrets.ARCADE_KEY_PASSWORD }}
+        run: ./gradlew assembleRelease --console=plain
+
+      - name: Name, checksum and notes
+        run: |
+          cp app/build/outputs/apk/release/app-release.apk arcade-tv.apk
+          sha256sum arcade-tv.apk > arcade-tv.apk.sha256
+          # This version's CHANGELOG section: from its "## [x.y.z]" heading to the next "## ".
+          awk -v v="${GITHUB_REF_NAME#v}" '
+            $0 ~ "^## \\[" v "\\]" { on = 1; next }
+            on && /^## / { exit }
+            on { print }' CHANGELOG.md > notes.md
+          test -s notes.md || echo "See CHANGELOG.md" > notes.md
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" arcade-tv.apk arcade-tv.apk.sha256 --title "Arcade $GITHUB_REF_NAME" --notes-file notes.md
+
+      - name: Remove the key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/release.jks"

@@ -38,6 +38,8 @@ class ControlPanel(private val activity: Activity, private val prefs: Prefs, pri
         fun nextWallpaper()
         fun defaultWallpaper()
         fun chooseWeatherCity()
+        /** City or units changed: fetch the forecast again now. */
+        fun weatherCityChanged()
         fun screensaverChanged()
     }
 
@@ -87,11 +89,11 @@ class ControlPanel(private val activity: Activity, private val prefs: Prefs, pri
 
         val now = LocalDateTime.now()
         content.addView(LinearLayout(activity).apply {
-            addView(activity.text(now.format(DateTimeFormatter.ofPattern("h:mm")), 54f))
+            addView(activity.text(now.format(activity.clockFormat()), 54f))
             addView(LinearLayout(activity).apply {
                 orientation = LinearLayout.VERTICAL
                 addView(activity.text(now.format(DateTimeFormatter.ofPattern("EEEE, MMMM d")), 18f))
-                host.weather?.let { addView(activity.text("${it.temp}° ${it.summary} · ${prefs.city}", 15f, Metro.regular, Metro.dimText)) }
+                host.weather?.let { addView(activity.text("${it.temp}° ${it.summary} · ${prefs.city ?: ""}", 15f, Metro.regular, Metro.dimText)) }
             }, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply { marginStart = dp(18); topMargin = dp(10) })
         })
 
@@ -172,7 +174,11 @@ class ControlPanel(private val activity: Activity, private val prefs: Prefs, pri
         )))
 
         section(right, "Weather")
-        right.addView(row(listOf(chip(prefs.city, "wx:city", false, accent) { host.chooseWeatherCity() })))
+        right.addView(row(listOf(
+            chip(prefs.city ?: "Choose City", "wx:city", false, accent) { host.chooseWeatherCity() },
+            chip("°F", "wx:f", prefs.fahrenheit, accent) { prefs.fahrenheit = true; host.weatherCityChanged(); build() },
+            chip("°C", "wx:c", !prefs.fahrenheit, accent) { prefs.fahrenheit = false; host.weatherCityChanged(); build() },
+        )))
 
         focusedTag?.let { tag -> content.post { content.findViewWithTag<View>(tag)?.requestFocus() } }
     }

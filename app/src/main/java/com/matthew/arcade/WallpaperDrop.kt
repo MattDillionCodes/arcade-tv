@@ -8,6 +8,8 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.drawable.GradientDrawable
 import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
 import android.os.Build
 import android.view.Gravity
 import android.view.View
@@ -30,6 +32,9 @@ import java.net.Inet4Address
 import java.net.ServerSocket
 import java.net.Socket
 import java.security.SecureRandom
+import java.util.Collections
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Semaphore
 import kotlin.concurrent.thread
 
 /**
@@ -46,9 +51,13 @@ class WallpaperDrop(
     private val onPhoto: (File) -> Unit,
 ) {
     private fun dp(v: Int) = activity.dp(v)
-    private var server: ServerSocket? = null
-    private var token = ""
+    // Read by the server's threads as well as the UI thread.
+    @Volatile private var server: ServerSocket? = null
+    @Volatile private var token = ""
     private var received = 0
+    /** Open client connections, closed with the screen; at most [MAX_CLIENTS] at once. */
+    private val clients: MutableSet<Socket> = Collections.newSetFromMap(ConcurrentHashMap())
+    private val slots = Semaphore(MAX_CLIENTS)
 
     private val qr = ImageView(activity)
     private val url = activity.text("", 14f, Metro.regular, Metro.dimText)
@@ -122,6 +131,8 @@ class WallpaperDrop(
         view.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
         runCatching { server?.close() }
         server = null
+        clients.forEach { runCatching { it.close() } } // ends any upload still in progress
+        clients.clear()
         view.animate().alpha(0f).translationY(dp(40).toFloat()).setInterpolator(Metro.easeIn).setDuration(200)
             .withEndAction { view.visibility = View.GONE }.start()
     }
@@ -133,10 +144,35 @@ class WallpaperDrop(
             val socket = runCatching { ServerSocket(port) }.getOrNull() ?: continue
             server = socket
             thread(isDaemon = true, name = "wallpaper-drop") {
+                // Nothing a client does may take the launcher down: every failure here is contained.
                 while (!socket.isClosed) {
-                    val client = runCatching { socket.accept() }.getOrNull() ?: break
-                    thread(isDaemon = true) {
-                        runCatching { client.use { handle(it, socket) } }
+                    val client = try {
+                        socket.accept()
+                    } catch (e: Throwable) {
+                        if (socket.isClosed) break
+                        Thread.sleep(200) // e.g. out of file descriptors: back off instead of spinning
+                        continue
+                    }
+                    // A few phones at once is plenty; anything beyond that is turned away, so a
+                    // flood of idle connections can't exhaust threads or memory.
+                    if (!slots.tryAcquire()) {
+                        runCatching { client.close() }
+                        continue
+                    }
+                    clients += client
+                    val release = { clients -= client; slots.release() }
+                    try {
+                        thread(isDaemon = true, name = "wallpaper-drop-client") {
+                            try {
+                                client.use { handle(it, socket) }
+                            } catch (_: Throwable) {
+                            } finally {
+                                release()
+                            }
+                        }
+                    } catch (_: Throwable) {
+                        release()
+                        runCatching { client.close() }
                     }
                 }
             }
@@ -146,10 +182,11 @@ class WallpaperDrop(
     }
 
     private fun handle(client: Socket, owner: ServerSocket) {
-        client.soTimeout = 30_000
+        client.soTimeout = HEAD_MS.toInt()
         val input = BufferedInputStream(client.getInputStream())
         val out = client.getOutputStream()
         val head = readHead(input) ?: return
+        client.soTimeout = 15_000 // per read while the photo itself arrives
         val lines = head.split("\r\n")
         val request = lines.first().split(" ")
         val method = request.getOrNull(0)
@@ -168,30 +205,57 @@ class WallpaperDrop(
                 val length = headers["content-length"]?.toIntOrNull()
                     ?: return respond(out, 411, "text/plain", "length required".toByteArray())
                 if (length <= 0 || length > MAX_BYTES) return respond(out, 413, "text/plain", "too big".toByteArray())
-                val file = File(Wallpapers.dir(activity), "phone-${System.currentTimeMillis()}.jpg")
-                file.outputStream().use { copy(input, it, length) }
-                val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                BitmapFactory.decodeFile(file.path, bounds)
-                if (bounds.outWidth <= 0) {
-                    file.delete()
-                    return respond(out, 415, "text/plain", "not an image".toByteArray())
-                }
-                respond(out, 200, "text/plain", "ok".toByteArray())
-                activity.runOnUiThread {
-                    received++
-                    status.setTextColor(accent())
-                    status.text = if (received == 1) "Got It — That's Your Wallpaper Now" else "Got $received Photos"
-                    onPhoto(file)
+                // Into a temporary file first: a cut-off or rejected upload never becomes a wallpaper.
+                val dir = Wallpapers.dir(activity)
+                val part = File.createTempFile("upload-", ".part", dir)
+                try {
+                    part.outputStream().use { copy(input, it, length) }
+                    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                    BitmapFactory.decodeFile(part.path, bounds)
+                    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
+                        return respond(out, 415, "text/plain", "not an image".toByteArray())
+                    }
+                    if (bounds.outWidth > MAX_SIDE || bounds.outHeight > MAX_SIDE) {
+                        return respond(out, 413, "text/plain", "image too large".toByteArray())
+                    }
+                    // The screen may have closed while the photo was arriving.
+                    if (owner !== server) return respond(out, 410, "text/plain", "closed".toByteArray())
+                    val file = File(dir, "phone-${System.currentTimeMillis()}-${newToken().take(4)}.jpg")
+                    if (!part.renameTo(file)) return respond(out, 500, "text/plain", "couldn't save".toByteArray())
+                    pruneUploads(dir)
+                    respond(out, 200, "text/plain", "ok".toByteArray())
+                    activity.runOnUiThread { arrived(file, owner) }
+                } finally {
+                    part.delete() // a no-op once it has been renamed
                 }
             }
             else -> respond(out, 404, "text/plain", "not found".toByteArray())
         }
     }
 
-    /** Request line + headers, up to the blank line. */
+    /** On the UI thread: show the new photo, unless the screen closed in the meantime. */
+    private fun arrived(file: File, owner: ServerSocket) {
+        if (owner !== server || !isOpen) return
+        received++
+        status.setTextColor(accent())
+        status.text = if (received == 1) "Got It — That's Your Wallpaper Now" else "Got $received Photos"
+        onPhoto(file)
+    }
+
+    /** Keeps the [MAX_UPLOADS] newest phone photos so repeated uploads can't fill the TV's storage. */
+    private fun pruneUploads(dir: File) {
+        dir.listFiles { f -> f.name.startsWith("phone-") }
+            ?.sortedByDescending { it.lastModified() }
+            ?.drop(MAX_UPLOADS)
+            ?.forEach { it.delete() }
+    }
+
+    /** Request line + headers, up to the blank line, within [HEAD_MS] in all (not per byte). */
     private fun readHead(input: InputStream): String? {
+        val deadline = System.nanoTime() + HEAD_MS * 1_000_000
         val buf = StringBuilder()
         while (buf.length < 16_384) {
+            if (System.nanoTime() > deadline) return null
             val b = input.read()
             if (b < 0) return null
             buf.append(b.toChar())
@@ -218,11 +282,19 @@ class WallpaperDrop(
         out.flush()
     }
 
+    /** The TV's Wi-Fi or Ethernet address: never a VPN's, which a phone at home can't reach. */
+    @Suppress("DEPRECATION") // allNetworks: the only way to list networks below API 31
     private fun lanAddress(): String? {
         val cm = activity.getSystemService(ConnectivityManager::class.java) ?: return null
-        val props = cm.getLinkProperties(cm.activeNetwork) ?: return null
-        return props.linkAddresses.map { it.address }
-            .firstOrNull { it is Inet4Address && !it.isLoopbackAddress }?.hostAddress
+        fun isLan(n: Network) = cm.getNetworkCapabilities(n)?.let {
+            !it.hasTransport(NetworkCapabilities.TRANSPORT_VPN) &&
+                (it.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) || it.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET))
+        } == true
+        val candidates = listOfNotNull(cm.activeNetwork) + cm.allNetworks.toList()
+        return candidates.filter(::isLan).firstNotNullOfOrNull { n ->
+            cm.getLinkProperties(n)?.linkAddresses?.map { it.address }
+                ?.firstOrNull { it is Inet4Address && !it.isLoopbackAddress }?.hostAddress
+        }
     }
 
     private fun isEmulator() = Build.FINGERPRINT.contains("generic") || Build.PRODUCT.contains("sdk")
@@ -276,6 +348,10 @@ class WallpaperDrop(
     companion object {
         const val PORT = 8765
         private const val MAX_BYTES = 25 * 1024 * 1024
+        private const val MAX_SIDE = 4096 // px; the phone page sends 1920x1080
+        private const val MAX_UPLOADS = 30
+        private const val MAX_CLIENTS = 4
+        private const val HEAD_MS = 5_000L
 
         private fun page(accent: Int): String {
             val hex = String.format("#%06X", accent and 0xFFFFFF)

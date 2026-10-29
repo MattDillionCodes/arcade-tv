@@ -71,6 +71,9 @@ class CityPicker(
             addView(field, LinearLayout.LayoutParams(dp(520), WRAP_CONTENT).apply { topMargin = dp(16) })
             addView(status, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply { topMargin = dp(14) })
             addView(results, LinearLayout.LayoutParams(dp(520), WRAP_CONTENT).apply { topMargin = dp(6) })
+            // Open-Meteo's data is CC BY 4.0: credit it where the weather is set up.
+            addView(activity.text("Weather Data By Open-Meteo.com", 13f, Metro.regular, Metro.dimText),
+                LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply { topMargin = dp(20) })
         }, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
     }
 
@@ -81,7 +84,7 @@ class CityPicker(
         if (isOpen) return
         isOpen = true
         view.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
-        current.text = "Now: ${prefs.city}"
+        current.text = prefs.city?.let { "Now: $it" } ?: "No City Chosen Yet"
         status.text = ""
         results.removeAllViews()
         field.setText("")

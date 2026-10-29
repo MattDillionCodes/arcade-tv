@@ -11,8 +11,21 @@ android {
         applicationId = "com.matthew.arcade"
         minSdk = 28 // Android TV 9+, as promised on the showcase page
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 100
+        versionName = "1.0.0"
+    }
+
+    // Public releases are signed with your own key, passed in by CI (see .github/workflows/release.yml).
+    // Without it (local ./install.sh builds) release falls back to the debug key, so a dev install
+    // updates in place on a test TV without losing its settings.
+    val keystore = System.getenv("ARCADE_KEYSTORE")?.let { file(it) }?.takeIf { it.exists() }
+    signingConfigs {
+        if (keystore != null) create("release") {
+            storeFile = keystore
+            storePassword = System.getenv("ARCADE_KEYSTORE_PASSWORD")
+            keyAlias = System.getenv("ARCADE_KEY_ALIAS")
+            keyPassword = System.getenv("ARCADE_KEY_PASSWORD")
+        }
     }
 
     buildTypes {
@@ -20,7 +33,7 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
     }
     packaging {
@@ -38,5 +51,5 @@ kotlin {
 
 dependencies {
     // QR encoder for the wallpaper upload code (pure Java, R8 strips what isn't used).
-    implementation("com.google.zxing:core:3.5.3")
+    implementation("com.google.zxing:core:3.5.4")
 }

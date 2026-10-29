@@ -82,10 +82,15 @@ class HomeActivity : Activity(), ControlPanel.Host {
         statusTemp = text("", 20f)
         weatherTile = WeatherTile(this).apply {
             tag = "weather"
+            contentDescription = "Weather. Press to choose your city."
             setPlace(prefs.city)
             setOnClickListener { openPicker() }
         }
-        clockTile = ClockTile(this).apply { tag = "clock"; setOnClickListener { openControls() } }
+        clockTile = ClockTile(this).apply {
+            tag = "clock"
+            contentDescription = "Clock. Press for Action Center."
+            setOnClickListener { openControls() }
+        }
 
         startGrid = FrameLayout(this).apply { clipChildren = false }
         appsGrid = GridLayout(this).apply { columnCount = 3; clipChildren = false }
@@ -158,11 +163,26 @@ class HomeActivity : Activity(), ControlPanel.Host {
 
     // --- Start ---------------------------------------------------------------------------------
 
+    private var appsGeneration = 0
+
+    /**
+     * Reading every app's label, icon and banner touches other APKs' resources: slow on a cheap
+     * stick, so it happens off the main thread. Only the newest load is applied.
+     */
     private fun loadApps() {
-        apps = Apps.load(this)
-        buildStart()
-        buildAppList()
+        val generation = ++appsGeneration
+        Net.disk.execute {
+            val loaded = runCatching { Apps.load(this) }.getOrNull() ?: return@execute
+            runOnUiThread {
+                if (generation != appsGeneration || isDestroyed) return@runOnUiThread
+                apps = loaded
+                buildStart()
+                buildAppList()
+            }
+        }
     }
+
+    private val reloadApps = Runnable { loadApps() }
 
     private fun buildStart() {
         val focusedTag = currentFocus?.takeIf { it.parent === startGrid }?.tag
@@ -172,10 +192,10 @@ class HomeActivity : Activity(), ControlPanel.Host {
         hero?.let { tiles += appTile(it, TileSize.LARGE).apply { tag = "hero" } }
         tiles += weatherTile
         tiles += clockTile
-        tiles += utilityTile(Icon.SLIDERS, "u:controls") { openControls() }
-        tiles += utilityTile(Icon.PICTURE, "u:wallpaper") { openDrop() }
-        tiles += utilityTile(Icon.INPUT, "u:inputs") { openControls() }
-        tiles += utilityTile(Icon.LIST, "u:apps") { firstAppRow()?.requestFocus() }
+        tiles += utilityTile(Icon.SLIDERS, "u:controls", "Action Center") { openControls() }
+        tiles += utilityTile(Icon.PICTURE, "u:wallpaper", "Wallpaper From Your Phone") { openDrop() }
+        tiles += utilityTile(Icon.INPUT, "u:inputs", "Inputs") { openControls() }
+        tiles += utilityTile(Icon.LIST, "u:apps", "All Apps") { firstAppRow()?.requestFocus() }
         pinned(hero).forEach { tiles += appTile(it, prefs.tileSize(it.key)) }
         place(tiles)
         applyTileLook()
@@ -237,6 +257,7 @@ class HomeActivity : Activity(), ControlPanel.Host {
 
     private fun appTile(app: App, size: TileSize) = Tile(this, size).apply {
         this.app = app
+        contentDescription = app.label // banner tiles often hide their text label
         tag = "app:${app.key}"
         setLabel(app.label)
         val look = app.look
@@ -285,7 +306,9 @@ class HomeActivity : Activity(), ControlPanel.Host {
         setOnLongClickListener { tileMenu(app, this); true }
     }
 
-    private fun utilityTile(icon: Icon, tag: String, onClick: () -> Unit) = Tile(this, TileSize.SMALL).apply {
+    /** [name] is what TalkBack reads: these tiles show only an icon. */
+    private fun utilityTile(icon: Icon, tag: String, name: String, onClick: () -> Unit) = Tile(this, TileSize.SMALL).apply {
+        contentDescription = name
         this.tag = tag
         setLabel(null)
         addView(IconView(context, icon), 0, FrameLayout.LayoutParams(dp(28), dp(28), Gravity.CENTER))
@@ -319,6 +342,7 @@ class HomeActivity : Activity(), ControlPanel.Host {
 
     /** Windows Phone's letter groups: a heading across the whole row, then that letter's apps. */
     private fun buildAppList() {
+        val focusedTag = currentFocus?.takeIf { it.parent === appsGrid }?.tag
         appsGrid.removeAllViews()
         apps.groupBy { letterOf(it.label) }.forEach { (letter, group) ->
             val first = appsGrid.childCount == 0
@@ -333,6 +357,8 @@ class HomeActivity : Activity(), ControlPanel.Host {
                 })
             }
         }
+        // A rebuild (an app installed or updated) keeps focus on the same row, not back on Start.
+        focusedTag?.let { tag -> appsGrid.findViewWithTag<View>(tag)?.requestFocus() }
     }
 
     private fun letterOf(label: String) =
@@ -364,9 +390,14 @@ class HomeActivity : Activity(), ControlPanel.Host {
         }, LinearLayout.LayoutParams(dp(42), dp(42)))
         val name = text(app.label, 19f, color = Color.argb(220, 255, 255, 255)).apply { maxLines = 1 }
         addView(name, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f).apply { marginStart = dp(14) })
-        setOnFocusChangeListener { _, f ->
+        setOnFocusChangeListener { v, f ->
             setBackgroundColor(if (f) Color.argb(70, 255, 255, 255) else Color.TRANSPARENT)
             name.setTextColor(if (f) Color.WHITE else Color.argb(220, 255, 255, 255))
+            // Scrolling only brings the row into view; keep its letter heading above it visible too.
+            if (f) appsScroll.post {
+                val top = (v.top - dp(64)).coerceAtLeast(0)
+                if (appsScroll.scrollY > top) appsScroll.smoothScrollTo(0, top)
+            }
         }
         setOnClickListener { launch(app) }
         setOnLongClickListener { tileMenu(app, this); true }
@@ -552,8 +583,9 @@ class HomeActivity : Activity(), ControlPanel.Host {
     }
 
     /** New city: relabel the tile and fetch its forecast now, not at the next 15-minute refresh. */
-    private fun weatherCityChanged() {
+    override fun weatherCityChanged() {
         weatherTile.setPlace(prefs.city)
+        retryMs = 15_000L
         root.removeCallbacks(refreshWeather)
         root.post(refreshWeather)
     }
@@ -580,7 +612,7 @@ class HomeActivity : Activity(), ControlPanel.Host {
         if (w == 0 || h == 0) return
         val name = prefs.wallpaper
         val accent = prefs.accent
-        Net.io.execute {
+        Net.disk.execute {
             val bitmap = Wallpapers.load(this, name, w, h, accent)
             runOnUiThread {
                 wallpaper = bitmap
@@ -595,7 +627,7 @@ class HomeActivity : Activity(), ControlPanel.Host {
     private fun tick() {
         lock.tick()
         val now = LocalDateTime.now()
-        clock.text = now.format(DateTimeFormatter.ofPattern("h:mm"))
+        clock.text = now.format(clockFormat())
         greeting.text = when (now.hour) {
             in 5..11 -> "Good Morning"
             in 12..16 -> "Good Afternoon"
@@ -605,16 +637,29 @@ class HomeActivity : Activity(), ControlPanel.Host {
         clockTile.tick()
     }
 
+    private var retryMs = 15_000L
+
     private val refreshWeather = object : Runnable {
         override fun run() {
             val city = prefs.city
+            if (city == null) {
+                // Nothing to fetch until a city is chosen; choosing one posts this again.
+                weather = null
+                weatherTile.noCity()
+                statusGlyph.visibility = View.GONE
+                statusTemp.text = ""
+                return
+            }
             val lat = prefs.cityLat
             val lon = prefs.cityLon
+            val fahrenheit = prefs.fahrenheit
             Net.io.execute {
-                val w = runCatching { Weather.fetch(lat, lon) }.getOrNull()
+                val w = runCatching { Weather.fetch(lat, lon, fahrenheit) }.getOrNull()
                 runOnUiThread {
-                    if (city != prefs.city) return@runOnUiThread // the city changed while this was in flight
+                    // The city or units changed while this was in flight: a newer fetch is coming.
+                    if (lat != prefs.cityLat || lon != prefs.cityLon || fahrenheit != prefs.fahrenheit) return@runOnUiThread
                     if (w != null) {
+                        retryMs = 15_000L
                         weather = w
                         weatherTile.bind(w)
                         statusGlyph.sky = w.sky
@@ -626,7 +671,8 @@ class HomeActivity : Activity(), ControlPanel.Host {
                 }
             }
             // Right after boot the network is often not up yet: retry soon until the first forecast.
-            root.postDelayed(this, if (weather == null) 15_000L else 15 * 60_000L)
+            // Offline, back off: 15 s, 30 s, 1 min... up to 5 min between tries.
+            root.postDelayed(this, if (weather == null) retryMs.also { retryMs = minOf(retryMs * 2, 300_000L) } else 15 * 60_000L)
         }
     }
 
@@ -644,7 +690,12 @@ class HomeActivity : Activity(), ControlPanel.Host {
     }
 
     private val packageReceiver = object : BroadcastReceiver() {
-        override fun onReceive(c: Context, i: Intent) = loadApps()
+        override fun onReceive(c: Context, i: Intent) {
+            // An update arrives as removed + added + changed: skip the removal, and reload once.
+            if (i.action == Intent.ACTION_PACKAGE_REMOVED && i.getBooleanExtra(Intent.EXTRA_REPLACING, false)) return
+            root.removeCallbacks(reloadApps)
+            root.postDelayed(reloadApps, 1_000)
+        }
     }
 
     override fun onStart() {
@@ -717,17 +768,19 @@ class HomeActivity : Activity(), ControlPanel.Host {
             return true
         }
         if (event.action == KeyEvent.ACTION_DOWN) when (event.keyCode) {
+            // Toggles act once per press: a held button repeats, and mustn't flicker the panel.
             KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_BUTTON_Y -> {
-                if (controls.isOpen) closeControls() else openControls()
+                if (event.repeatCount == 0) { if (controls.isOpen) closeControls() else openControls() }
                 return true
             }
             // A gamepad's X is the long-press: options for the focused tile.
             KeyEvent.KEYCODE_BUTTON_X -> if (!anyOverlay()) {
-                currentFocus?.performLongClick()
+                if (event.repeatCount == 0) currentFocus?.performLongClick()
                 return true
             }
-            // Up from the top row pulls down Action Center, as a swipe from the top did on the phone.
-            KeyEvent.KEYCODE_DPAD_UP -> if (!anyOverlay() && atTop(currentFocus)) {
+            // Up from the top row pulls down Action Center, as a swipe from the top did on the phone
+            // (but not when Up is held to scroll there: the panel only opens on a fresh press).
+            KeyEvent.KEYCODE_DPAD_UP -> if (event.repeatCount == 0 && !anyOverlay() && atTop(currentFocus)) {
                 openControls()
                 return true
             }

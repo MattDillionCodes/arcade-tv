@@ -22,7 +22,6 @@
         android:icon="@drawable/banner"
         android:banner="@drawable/banner"
         android:theme="@style/Arcade"
-        android:usesCleartextTraffic="true"
         android:supportsRtl="true">
 
         <activity

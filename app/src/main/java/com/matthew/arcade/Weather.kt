@@ -18,7 +18,10 @@ import kotlin.math.roundToInt
 import kotlin.math.sin
 
 object Net {
+    /** Network calls (forecast, city search): a slow request queues only behind other requests. */
     val io = Executors.newSingleThreadExecutor()
+    /** Disk and decoding (app list, wallpapers), so an offline TV never delays them. */
+    val disk = Executors.newSingleThreadExecutor()
 
     fun json(url: String): JSONObject = (URL(url).openConnection() as HttpURLConnection).run {
         connectTimeout = 8000
@@ -55,23 +58,23 @@ class Day(val date: LocalDate, val hi: Int, val lo: Int, val sky: Sky)
 /** Current conditions and the next few days from Open-Meteo (free, no API key). */
 class Weather(val temp: Int, val feels: Int, val sky: Sky, val summary: String, val days: List<Day>) {
     companion object {
-        fun fetch(lat: Double, lon: Double): Weather {
+        fun fetch(lat: Double, lon: Double, fahrenheit: Boolean): Weather {
             val root = Net.json("https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon" +
                 "&current=temperature_2m,apparent_temperature,weather_code,is_day" +
                 "&daily=weather_code,temperature_2m_max,temperature_2m_min&forecast_days=4" +
-                "&temperature_unit=fahrenheit&timezone=auto")
+                "&temperature_unit=${if (fahrenheit) "fahrenheit" else "celsius"}&timezone=auto")
             val now = root.getJSONObject("current")
             val code = now.getInt("weather_code")
             val day = now.getInt("is_day") == 1
             val daily = root.getJSONObject("daily")
             val dates = daily.getJSONArray("time")
-            val days = (0 until dates.length()).map { i ->
-                Day(
-                    LocalDate.parse(dates.getString(i)),
-                    daily.getJSONArray("temperature_2m_max").getDouble(i).roundToInt(),
-                    daily.getJSONArray("temperature_2m_min").getDouble(i).roundToInt(),
-                    sky(daily.getJSONArray("weather_code").getInt(i), true),
-                )
+            // A day with a missing value (JSON null) is left out rather than failing the forecast.
+            val days = (0 until dates.length()).mapNotNull { i ->
+                val hi = daily.getJSONArray("temperature_2m_max").optDouble(i)
+                val lo = daily.getJSONArray("temperature_2m_min").optDouble(i)
+                if (hi.isNaN() || lo.isNaN()) return@mapNotNull null
+                Day(LocalDate.parse(dates.getString(i)), hi.roundToInt(), lo.roundToInt(),
+                    sky(daily.getJSONArray("weather_code").optInt(i, 3), true))
             }
             return Weather(
                 now.getDouble("temperature_2m").roundToInt(),
@@ -125,6 +128,7 @@ class WeatherGlyph(context: Context) : View(context) {
         strokeJoin = Paint.Join.ROUND
     }
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }
+    private val bolt = Path()
 
     override fun onDraw(c: Canvas) {
         val s = min(width, height).toFloat()
@@ -154,7 +158,8 @@ class WeatherGlyph(context: Context) : View(context) {
             }
             Sky.STORM -> {
                 cloud(c, s * 0.5f, s * 0.36f, s * 0.74f)
-                c.drawPath(Path().apply {
+                c.drawPath(bolt.apply {
+                    reset()
                     moveTo(s * 0.54f, s * 0.58f); lineTo(s * 0.42f, s * 0.76f); lineTo(s * 0.52f, s * 0.76f)
                     lineTo(s * 0.44f, s * 0.94f); lineTo(s * 0.64f, s * 0.7f); lineTo(s * 0.54f, s * 0.7f); close()
                 }, fill)

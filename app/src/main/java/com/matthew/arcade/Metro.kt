@@ -5,10 +5,13 @@ import android.content.Context
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.Drawable
+import android.text.format.DateFormat
 import android.util.TypedValue
 import android.view.View
 import android.view.animation.PathInterpolator
 import android.widget.TextView
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 /** The Windows Phone design language, reduced to what a TV launcher needs. */
 object Metro {
@@ -66,6 +69,13 @@ class App(
     val key: String = component.flattenToShortString()
 }
 
+/** Built-in wallpapers renamed before 1.0, so an earlier choice still finds its file. */
+private val renamedWallpapers = mapOf("01-zune.jpg" to "01-sunset.jpg", "04-lumia.jpg" to "04-cobalt.jpg")
+
+/** "h:mm", or "H:mm" when the TV is set to 24-hour time. */
+fun Context.clockFormat(): DateTimeFormatter =
+    DateTimeFormatter.ofPattern(if (DateFormat.is24HourFormat(this)) "H:mm" else "h:mm")
+
 /** Everything the user can change, in one SharedPreferences file. */
 class Prefs(context: Context) {
     private val sp = context.getSharedPreferences("arcade", Context.MODE_PRIVATE)
@@ -89,20 +99,25 @@ class Prefs(context: Context) {
         get() = sp.getString("pins", null)?.split(',')?.filter { it.isNotEmpty() }
         set(v) = sp.edit().putString("pins", v?.joinToString(",")).apply()
 
-    /** Where the weather is for. Los Angeles until you pick another city. */
-    var city: String
-        get() = sp.getString("city", "Los Angeles")!!
+    /** Where the weather is for; null until you choose a city (no location is guessed or sent). */
+    var city: String?
+        get() = sp.getString("city", null)
         set(v) = sp.edit().putString("city", v).apply()
     var cityLat: Double
-        get() = sp.getFloat("cityLat", 34.0522f).toDouble()
+        get() = sp.getFloat("cityLat", 0f).toDouble()
         set(v) = sp.edit().putFloat("cityLat", v.toFloat()).apply()
     var cityLon: Double
-        get() = sp.getFloat("cityLon", -118.2437f).toDouble()
+        get() = sp.getFloat("cityLon", 0f).toDouble()
         set(v) = sp.edit().putFloat("cityLon", v.toFloat()).apply()
+
+    /** °F in the countries that use it, °C everywhere else, until you choose. */
+    var fahrenheit: Boolean
+        get() = sp.getBoolean("fahrenheit", Locale.getDefault().country in setOf("US", "LR", "MM", "BS", "BZ", "KY", "PW"))
+        set(v) = sp.edit().putBoolean("fahrenheit", v).apply()
 
     /** File name inside the wallpapers folder, or null for the generated one. */
     var wallpaper: String?
-        get() = sp.getString("wallpaper", null)
+        get() = sp.getString("wallpaper", null)?.let { renamedWallpapers[it] ?: it }
         set(v) = sp.edit().putString("wallpaper", v).apply()
 
     fun tileColor(key: String): Int? = if (sp.contains("color.$key")) sp.getInt("color.$key", 0) else null

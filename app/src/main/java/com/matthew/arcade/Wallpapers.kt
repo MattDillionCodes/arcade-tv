@@ -56,6 +56,8 @@ object Wallpapers {
         if (bounds.outWidth <= 0) return null
         var sample = 1
         while (bounds.outWidth / (sample * 2) >= w && bounds.outHeight / (sample * 2) >= h) sample *= 2
+        // Odd shapes (a 65000x1080 strip) would still decode huge: cap the pixels at 4 screens' worth.
+        while ((bounds.outWidth / sample).toLong() * (bounds.outHeight / sample) > 4L * w * h) sample *= 2
         // Always sRGB: wide-gamut photos otherwise cost a colour conversion on every frame.
         val src = open().use {
             BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply {

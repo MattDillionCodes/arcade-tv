@@ -11,7 +11,6 @@ import android.graphics.Color
 import android.graphics.LinearGradient
 import android.graphics.Matrix
 import android.graphics.Paint
-import android.graphics.RectF
 import android.graphics.Shader
 import android.text.TextUtils
 import android.view.Gravity
@@ -267,7 +266,7 @@ class WeatherTile(context: Context) : LiveTile(context, TileSize.WIDE) {
     private val dayRow = LinearLayout(context)
 
     init {
-        setPlace("Los Angeles")
+        setPlace(null)
         addFace(LinearLayout(context).apply {
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(16), dp(10), dp(14), dp(28))
@@ -285,7 +284,16 @@ class WeatherTile(context: Context) : LiveTile(context, TileSize.WIDE) {
         temp.visibility = GONE
     }
 
-    fun setPlace(city: String) = setLabel("Weather · $city")
+    fun setPlace(city: String?) = setLabel(if (city == null) "Weather" else "Weather · $city")
+
+    /** No city chosen yet (a fresh install): say how to choose one instead of guessing. */
+    fun noCity() {
+        loaded = false
+        glyph.visibility = GONE
+        temp.visibility = GONE
+        feels.text = ""
+        summary.text = "Press To Choose Your City"
+    }
 
     /** Nothing to turn over to until there's a forecast on the back. */
     override fun flip() {
@@ -343,7 +351,7 @@ class ClockTile(context: Context) : LiveTile(context, TileSize.MEDIUM) {
 
     fun tick() {
         val now = LocalDateTime.now()
-        time.text = now.format(DateTimeFormatter.ofPattern("h:mm"))
+        time.text = now.format(context.clockFormat())
         weekday.text = now.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.getDefault())
         dayNumber.text = now.dayOfMonth.toString()
         month.text = now.month.getDisplayName(TextStyle.FULL, Locale.getDefault())
@@ -354,6 +362,7 @@ enum class Icon { SLIDERS, PICTURE, INPUT, LIST }
 
 /** Monochrome line icons for the small utility tiles. */
 class IconView(context: Context, private val icon: Icon) : View(context) {
+    private val path = android.graphics.Path()
     private val p = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
         style = Paint.Style.STROKE
@@ -373,15 +382,16 @@ class IconView(context: Context, private val icon: Icon) : View(context) {
                 c.drawCircle(s * floatArrayOf(0.65f, 0.32f, 0.55f)[i], y, s * 0.085f, fill)
             }
             Icon.PICTURE -> {
-                c.drawRect(RectF(s * 0.14f, s * 0.22f, s * 0.86f, s * 0.78f), p)
-                c.drawPath(android.graphics.Path().apply {
+                c.drawRect(s * 0.14f, s * 0.22f, s * 0.86f, s * 0.78f, p)
+                c.drawPath(path.apply {
+                    reset()
                     moveTo(s * 0.2f, s * 0.72f); lineTo(s * 0.42f, s * 0.46f); lineTo(s * 0.58f, s * 0.62f)
                     lineTo(s * 0.68f, s * 0.52f); lineTo(s * 0.8f, s * 0.72f); close()
                 }, fill)
                 c.drawCircle(s * 0.66f, s * 0.36f, s * 0.06f, fill)
             }
             Icon.INPUT -> {
-                c.drawRect(RectF(s * 0.12f, s * 0.2f, s * 0.88f, s * 0.68f), p)
+                c.drawRect(s * 0.12f, s * 0.2f, s * 0.88f, s * 0.68f, p)
                 c.drawLine(s * 0.36f, s * 0.82f, s * 0.64f, s * 0.82f, p)
                 c.drawLine(s * 0.5f, s * 0.68f, s * 0.5f, s * 0.82f, p)
             }

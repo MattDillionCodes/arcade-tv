@@ -104,7 +104,6 @@ class Look(val art: Drawable, val isBanner: Boolean, val background: Int?, val b
  * [pinned] is the key the user chose with "make hero" (null if they never did, or chose
  * "let arcade choose"); [launches] counts how many times Arcade has launched each app key.
  */
-fun pickHero(apps: List<App>, pinned: String?, launches: Map<String, Int>): App? {
-    // TODO(human): decide the hero when nothing (or a since-uninstalled app) is pinned.
-    return apps.firstOrNull { it.key == pinned } ?: apps.firstOrNull()
-}
+fun pickHero(apps: List<App>, pinned: String?, launches: Map<String, Int>): App? =
+    // An uninstalled pin simply isn't in [apps] any more, so it falls through to the favourites.
+    apps.firstOrNull { it.key == pinned } ?: Apps.favourites(apps, launches).firstOrNull()

@@ -68,7 +68,7 @@ class LockScreen(private val activity: Activity) {
         }
     }
 
-    fun show(wallpaper: Bitmap?, forecast: Weather?, city: String) {
+    fun show(wallpaper: Bitmap?, forecast: Weather?, city: String?) {
         if (isShowing) return
         isShowing = true
         backdrop.setImageBitmap(wallpaper)
@@ -98,7 +98,7 @@ class LockScreen(private val activity: Activity) {
 
     fun tick() {
         val now = LocalDateTime.now()
-        time.text = now.format(DateTimeFormatter.ofPattern("h:mm"))
+        time.text = now.format(activity.clockFormat())
         date.text = now.format(DateTimeFormatter.ofPattern("EEEE, MMMM d"))
     }
 }
