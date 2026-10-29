@@ -149,7 +149,7 @@ open class Tile(context: Context, val size: TileSize) : FrameLayout(context) {
         val w = width.toFloat()
         val h = height.toFloat()
         if (dim > 0f) {
-            dimPaint.color = Color.argb((130 * dim).toInt(), 0, 0, 0)
+            dimPaint.color = Color.argb((55 * dim).toInt(), 0, 0, 0)
             c.drawRect(0f, 0f, w, h, dimPaint)
         }
         if (shine >= 0f) {

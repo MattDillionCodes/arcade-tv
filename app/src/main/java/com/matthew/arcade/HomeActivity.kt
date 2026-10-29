@@ -170,12 +170,15 @@ class HomeActivity : Activity(), ControlPanel.Host {
         if (currentFocus == null || focusedTag != null) target?.requestFocus()
     }
 
-    /** While a Start tile has focus, every other Start tile dims. */
+    /**
+     * While a Start tile has focus, the other app and utility tiles dim slightly. The live weather
+     * and clock tiles never dim: they're there to be read, not chosen.
+     */
     private fun spotlight(focused: View?) {
         val inStart = focused?.parent === startGrid
         for (i in 0 until startGrid.childCount) {
             val tile = startGrid.getChildAt(i) as Tile
-            tile.dimmed = inStart && tile !== focused
+            tile.dimmed = inStart && tile !== focused && tile !is LiveTile
         }
     }
 
