@@ -5,6 +5,7 @@ import android.content.Context
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.Drawable
+import android.util.TypedValue
 import android.view.View
 import android.view.animation.PathInterpolator
 import android.widget.TextView
@@ -42,6 +43,12 @@ fun Context.text(s: CharSequence, sp: Float, face: Typeface = Metro.light, color
         setTextColor(color)
         includeFontPadding = false
     }
+
+/** Keeps a label on one line, shrinking it between [minSp] and [maxSp] to fit its width. */
+fun TextView.fitOneLine(minSp: Int, maxSp: Int) {
+    maxLines = 1
+    setAutoSizeTextTypeUniformWithConfiguration(minSp, maxSp, 1, TypedValue.COMPLEX_UNIT_SP)
+}
 
 /**
  * One TV-launchable app. [key] is its flattened component name, used everywhere in prefs.
@@ -81,6 +88,17 @@ class Prefs(context: Context) {
     var pins: List<String>?
         get() = sp.getString("pins", null)?.split(',')?.filter { it.isNotEmpty() }
         set(v) = sp.edit().putString("pins", v?.joinToString(",")).apply()
+
+    /** Where the weather is for. Los Angeles until you pick another city. */
+    var city: String
+        get() = sp.getString("city", "Los Angeles")!!
+        set(v) = sp.edit().putString("city", v).apply()
+    var cityLat: Double
+        get() = sp.getFloat("cityLat", 34.0522f).toDouble()
+        set(v) = sp.edit().putFloat("cityLat", v.toFloat()).apply()
+    var cityLon: Double
+        get() = sp.getFloat("cityLon", -118.2437f).toDouble()
+        set(v) = sp.edit().putFloat("cityLon", v.toFloat()).apply()
 
     /** File name inside the wallpapers folder, or null for the generated one. */
     var wallpaper: String?

@@ -17,12 +17,13 @@ TV=192.168.68.61:5555 ./install.sh  # a TV over ADB Wi-Fi
 - **Start**: tiles flow column by column into a 4-row grid (small 1x1, medium 2x2, wide 4x2,
   large 4x4), Windows Phone style.
   - **Hero tile** (large): the pinned app, or `pickHero()` in `Apps.kt` decides.
-  - **Weather** (wide, live): now, then turns over to the next three days. Open-Meteo, no key;
-    location is Los Angeles (`Weather.kt`).
+  - **Weather** (wide, live): now, then turns over to the next three days. Open-Meteo, no key.
+    Press it (or *Weather* in Action Center) to choose your city; Los Angeles until you do.
   - **Clock** (medium, live): time and weekday, then the date.
   - **Small tiles**: Action Center, wallpaper from phone, inputs, all apps.
   - **Pinned apps** (medium): the first eight A–Z until you pin your own.
-- **Apps**: everything, A to Z, as Windows Phone's app list.
+- **Apps**: everything, A to Z, grouped under accent-coloured letter headings like Windows Phone's
+  app list.
 
 ## Controls
 

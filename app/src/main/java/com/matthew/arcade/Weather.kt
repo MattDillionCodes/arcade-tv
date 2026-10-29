@@ -9,6 +9,7 @@ import android.view.View
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
+import java.net.URLEncoder
 import java.time.LocalDate
 import java.util.concurrent.Executors
 import kotlin.math.cos
@@ -27,6 +28,26 @@ object Net {
     }
 }
 
+/** A city from Open-Meteo's place search (free, no key, like the forecast). */
+class Place(val name: String, val detail: String, val lat: Double, val lon: Double) {
+    companion object {
+        fun search(query: String): List<Place> {
+            val q = URLEncoder.encode(query.trim(), "UTF-8")
+            val results = Net.json("https://geocoding-api.open-meteo.com/v1/search?name=$q&count=4&language=en&format=json")
+                .optJSONArray("results") ?: return emptyList()
+            return (0 until results.length()).map { i ->
+                val r = results.getJSONObject(i)
+                Place(
+                    r.getString("name"),
+                    listOf(r.optString("admin1"), r.optString("country")).filter { it.isNotEmpty() }.distinct().joinToString(", "),
+                    r.getDouble("latitude"),
+                    r.getDouble("longitude"),
+                )
+            }
+        }
+    }
+}
+
 enum class Sky { CLEAR, NIGHT, PARTLY, CLOUD, FOG, RAIN, SNOW, STORM }
 
 class Day(val date: LocalDate, val hi: Int, val lo: Int, val sky: Sky)
@@ -34,14 +55,11 @@ class Day(val date: LocalDate, val hi: Int, val lo: Int, val sky: Sky)
 /** Current conditions and the next few days from Open-Meteo (free, no API key). */
 class Weather(val temp: Int, val feels: Int, val sky: Sky, val summary: String, val days: List<Day>) {
     companion object {
-        const val PLACE = "Los Angeles"
-        private const val URL = "https://api.open-meteo.com/v1/forecast?latitude=34.0522&longitude=-118.2437" +
-            "&current=temperature_2m,apparent_temperature,weather_code,is_day" +
-            "&daily=weather_code,temperature_2m_max,temperature_2m_min&forecast_days=4" +
-            "&temperature_unit=fahrenheit&timezone=auto"
-
-        fun fetch(): Weather {
-            val root = Net.json(URL)
+        fun fetch(lat: Double, lon: Double): Weather {
+            val root = Net.json("https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon" +
+                "&current=temperature_2m,apparent_temperature,weather_code,is_day" +
+                "&daily=weather_code,temperature_2m_max,temperature_2m_min&forecast_days=4" +
+                "&temperature_unit=fahrenheit&timezone=auto")
             val now = root.getJSONObject("current")
             val code = now.getInt("weather_code")
             val day = now.getInt("is_day") == 1

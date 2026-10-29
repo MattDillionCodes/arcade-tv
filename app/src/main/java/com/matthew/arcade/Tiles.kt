@@ -254,13 +254,14 @@ open class LiveTile(context: Context, size: TileSize) : Tile(context, size) {
 class WeatherTile(context: Context) : LiveTile(context, TileSize.WIDE) {
     private val glyph = WeatherGlyph(context)
     private val temp = context.text("", 46f)
-    private val summary = context.text("Loading…", 18f)
+    // One line each, shrinking to fit ("Partly Cloudy", "Thunderstorms") rather than wrapping.
+    private val summary = context.text("Loading…", 18f).apply { fitOneLine(12, 18) }
     private var loaded = false
-    private val feels = context.text("", 13f, Metro.regular, Color.argb(200, 255, 255, 255)).apply { maxLines = 1 }
+    private val feels = context.text("", 13f, Metro.regular, Color.argb(200, 255, 255, 255)).apply { fitOneLine(10, 13) }
     private val dayRow = LinearLayout(context)
 
     init {
-        setLabel("Weather · ${Weather.PLACE}")
+        setPlace("Los Angeles")
         addFace(LinearLayout(context).apply {
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(16), dp(10), dp(14), dp(28))
@@ -269,7 +270,7 @@ class WeatherTile(context: Context) : LiveTile(context, TileSize.WIDE) {
             addView(LinearLayout(context).apply {
                 orientation = LinearLayout.VERTICAL
                 addView(summary)
-                addView(feels, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply { topMargin = dp(4) })
+                addView(feels, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(4) })
             }, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f).apply { marginStart = dp(10) })
         })
         addFace(dayRow.apply { setPadding(dp(10), dp(12), dp(10), dp(28)) })
@@ -277,6 +278,8 @@ class WeatherTile(context: Context) : LiveTile(context, TileSize.WIDE) {
         glyph.visibility = GONE
         temp.visibility = GONE
     }
+
+    fun setPlace(city: String) = setLabel("Weather · $city")
 
     /** Nothing to turn over to until there's a forecast on the back. */
     override fun flip() {

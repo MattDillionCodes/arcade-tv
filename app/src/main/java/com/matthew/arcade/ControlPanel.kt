@@ -37,6 +37,7 @@ class ControlPanel(private val activity: Activity, private val prefs: Prefs, pri
         fun wallpaperFromPhone()
         fun nextWallpaper()
         fun defaultWallpaper()
+        fun chooseWeatherCity()
     }
 
     private val audio = activity.getSystemService(AudioManager::class.java)
@@ -89,7 +90,7 @@ class ControlPanel(private val activity: Activity, private val prefs: Prefs, pri
             addView(LinearLayout(activity).apply {
                 orientation = LinearLayout.VERTICAL
                 addView(activity.text(now.format(DateTimeFormatter.ofPattern("EEEE, MMMM d")), 18f))
-                host.weather?.let { addView(activity.text("${it.temp}° ${it.summary} · ${Weather.PLACE}", 15f, Metro.regular, Metro.dimText)) }
+                host.weather?.let { addView(activity.text("${it.temp}° ${it.summary} · ${prefs.city}", 15f, Metro.regular, Metro.dimText)) }
             }, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply { marginStart = dp(18); topMargin = dp(10) })
         })
 
@@ -159,6 +160,9 @@ class ControlPanel(private val activity: Activity, private val prefs: Prefs, pri
             chip("Next", "wp:next", false, accent) { host.nextWallpaper() },
             chip("Default", "wp:default", prefs.wallpaper == null, accent) { host.defaultWallpaper(); build() },
         )))
+
+        section(right, "Weather")
+        right.addView(row(listOf(chip(prefs.city, "wx:city", false, accent) { host.chooseWeatherCity() })))
 
         focusedTag?.let { tag -> content.post { content.findViewWithTag<View>(tag)?.requestFocus() } }
     }

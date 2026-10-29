@@ -57,6 +57,7 @@ class HomeActivity : Activity(), ControlPanel.Host {
     private lateinit var controls: ControlPanel
     private lateinit var menu: AppMenu
     private lateinit var drop: WallpaperDrop
+    private lateinit var picker: CityPicker
     private lateinit var toast: TextView
 
     /** Tag of whatever had focus before an overlay opened, to put focus back afterwards. */
@@ -78,7 +79,11 @@ class HomeActivity : Activity(), ControlPanel.Host {
         clock = text("", 26f)
         statusGlyph = WeatherGlyph(this).apply { visibility = View.GONE } // shown with the first forecast
         statusTemp = text("", 20f)
-        weatherTile = WeatherTile(this).apply { tag = "weather"; setOnClickListener { openControls() } }
+        weatherTile = WeatherTile(this).apply {
+            tag = "weather"
+            setPlace(prefs.city)
+            setOnClickListener { openPicker() }
+        }
         clockTile = ClockTile(this).apply { tag = "clock"; setOnClickListener { openControls() } }
 
         startGrid = FrameLayout(this).apply { clipChildren = false }
@@ -89,7 +94,9 @@ class HomeActivity : Activity(), ControlPanel.Host {
             setFadingEdgeLength(dp(24))
             addView(appsGrid)
         }
-        appsSection = section("Apps", appsScroll, LinearLayout.LayoutParams(dp(APP_W * 3 + 48), dp(300)))
+        // The section doesn't clip (focused tiles grow past their edges), which would also let the
+        // scrolled list draw outside its box; a plain frame around it clips it again.
+        appsSection = section("Apps", FrameLayout(this).apply { addView(appsScroll) }, LinearLayout.LayoutParams(dp(APP_W * 3 + 48), dp(300)))
         val content = LinearLayout(this).apply {
             clipChildren = false
             clipToPadding = false
@@ -111,6 +118,8 @@ class HomeActivity : Activity(), ControlPanel.Host {
         controls = ControlPanel(this, prefs, this)
         menu = AppMenu(this) { restoreFocus() }
         drop = WallpaperDrop(this, { prefs.accent }) { file -> useWallpaper(file.name) }
+        // The picker closes itself after a pick; focus goes back once it has.
+        picker = CityPicker(this, prefs, { prefs.accent }) { weatherCityChanged(); root.post { restoreFocus() } }
         toast = text("", 18f, Metro.regular).apply {
             setPadding(dp(48), dp(14), dp(48), dp(14))
             visibility = View.GONE
@@ -132,6 +141,7 @@ class HomeActivity : Activity(), ControlPanel.Host {
             addView(controls.view, FrameLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT, Gravity.TOP))
             addView(menu.view, FrameLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT, Gravity.BOTTOM))
             addView(drop.view, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
+            addView(picker.view, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
             addView(toast, FrameLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT, Gravity.TOP))
             addOnLayoutChangeListener { _, l, t, r, b, ol, ot, or, ob ->
                 if (r - l != or - ol || b - t != ob - ot) loadWallpaper()
@@ -162,7 +172,7 @@ class HomeActivity : Activity(), ControlPanel.Host {
         tiles += utilityTile(Icon.SLIDERS, "u:controls") { openControls() }
         tiles += utilityTile(Icon.PICTURE, "u:wallpaper") { openDrop() }
         tiles += utilityTile(Icon.INPUT, "u:inputs") { openControls() }
-        tiles += utilityTile(Icon.LIST, "u:apps") { appsGrid.getChildAt(0)?.requestFocus() }
+        tiles += utilityTile(Icon.LIST, "u:apps") { firstAppRow()?.requestFocus() }
         pinned(hero).forEach { tiles += appTile(it, TileSize.MEDIUM) }
         place(tiles)
         applyTileLook()
@@ -298,15 +308,39 @@ class HomeActivity : Activity(), ControlPanel.Host {
 
     // --- apps list -----------------------------------------------------------------------------
 
+    /** Windows Phone's letter groups: a heading across the whole row, then that letter's apps. */
     private fun buildAppList() {
         appsGrid.removeAllViews()
-        apps.forEach { app ->
-            appsGrid.addView(appRow(app), GridLayout.LayoutParams().apply {
-                width = dp(APP_W)
-                setMargins(0, 0, dp(16), dp(6))
-            })
+        apps.groupBy { letterOf(it.label) }.forEach { (letter, group) ->
+            val first = appsGrid.childCount == 0
+            appsGrid.addView(letterHeading(letter),
+                GridLayout.LayoutParams(GridLayout.spec(GridLayout.UNDEFINED), GridLayout.spec(0, appsGrid.columnCount)).apply {
+                    setMargins(0, dp(if (first) 0 else 12), 0, dp(8))
+                })
+            group.forEach { app ->
+                appsGrid.addView(appRow(app), GridLayout.LayoutParams().apply {
+                    width = dp(APP_W)
+                    setMargins(0, 0, dp(16), dp(6))
+                })
+            }
         }
     }
+
+    private fun letterOf(label: String) =
+        label.firstOrNull()?.uppercaseChar()?.takeIf { it.isLetter() }?.toString() ?: "#"
+
+    /** An accent square with the letter in its corner, like Windows Phone's (not focusable). */
+    private fun letterHeading(letter: String) = FrameLayout(this).apply {
+        addView(text(letter, 22f).apply {
+            gravity = Gravity.BOTTOM or Gravity.START
+            setPadding(dp(6), 0, 0, dp(2))
+            setBackgroundColor(prefs.accent)
+        }, FrameLayout.LayoutParams(dp(42), dp(42)))
+    }
+
+    /** The first app in the list (index 0 is a letter heading, which can't take focus). */
+    private fun firstAppRow(): View? =
+        (0 until appsGrid.childCount).map { appsGrid.getChildAt(it) }.firstOrNull { it.isFocusable }
 
     /** Windows Phone's app list: an accent square with the icon, then the name. */
     private fun appRow(app: App) = LinearLayout(this).apply {
@@ -400,7 +434,7 @@ class HomeActivity : Activity(), ControlPanel.Host {
 
     // --- overlays ------------------------------------------------------------------------------
 
-    private fun anyOverlay() = controls.isOpen || menu.isOpen || drop.isOpen
+    private fun anyOverlay() = controls.isOpen || menu.isOpen || drop.isOpen || picker.isOpen
 
     /** While an overlay is up, D-pad focus can't wander back onto the tiles behind it. */
     private fun blockHome() {
@@ -438,6 +472,18 @@ class HomeActivity : Activity(), ControlPanel.Host {
         restoreFocus()
     }
 
+    private fun openPicker() {
+        controls.close()
+        menu.close()
+        blockHome()
+        picker.open()
+    }
+
+    private fun closePicker() {
+        picker.close()
+        restoreFocus()
+    }
+
     private fun showToast(message: String) {
         toast.text = message
         toast.setBackgroundColor(prefs.accent)
@@ -465,6 +511,15 @@ class HomeActivity : Activity(), ControlPanel.Host {
     override fun photoTilesChanged() = applyTileLook()
 
     override fun wallpaperFromPhone() = openDrop()
+
+    override fun chooseWeatherCity() = openPicker()
+
+    /** New city: relabel the tile and fetch its forecast now, not at the next 15-minute refresh. */
+    private fun weatherCityChanged() {
+        weatherTile.setPlace(prefs.city)
+        root.removeCallbacks(refreshWeather)
+        root.post(refreshWeather)
+    }
 
     override fun nextWallpaper() {
         val names = Wallpapers.names(this)
@@ -514,9 +569,13 @@ class HomeActivity : Activity(), ControlPanel.Host {
 
     private val refreshWeather = object : Runnable {
         override fun run() {
+            val city = prefs.city
+            val lat = prefs.cityLat
+            val lon = prefs.cityLon
             Net.io.execute {
-                val w = runCatching { Weather.fetch() }.getOrNull()
+                val w = runCatching { Weather.fetch(lat, lon) }.getOrNull()
                 runOnUiThread {
+                    if (city != prefs.city) return@runOnUiThread // the city changed while this was in flight
                     if (w != null) {
                         weather = w
                         weatherTile.bind(w)
@@ -585,6 +644,7 @@ class HomeActivity : Activity(), ControlPanel.Host {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         drop.close()
+        picker.close()
         menu.close()
         controls.close()
         returnTag = "hero"
@@ -630,7 +690,7 @@ class HomeActivity : Activity(), ControlPanel.Host {
     private fun atTop(v: View?): Boolean = when {
         v == null -> false
         v.parent === startGrid -> (v.layoutParams as FrameLayout.LayoutParams).topMargin == 0
-        v.parent === appsGrid -> appsGrid.indexOfChild(v) < appsGrid.columnCount
+        v.parent === appsGrid -> v.top == firstAppRow()?.top
         else -> false
     }
 
@@ -638,6 +698,7 @@ class HomeActivity : Activity(), ControlPanel.Host {
         if (keyCode == KeyEvent.KEYCODE_BACK) {
             when {
                 drop.isOpen -> closeDrop()
+                picker.isOpen -> closePicker()
                 menu.isOpen -> menu.close()
                 controls.isOpen -> closeControls()
                 panorama.scrollX > 0 -> {
