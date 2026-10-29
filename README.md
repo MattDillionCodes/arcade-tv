@@ -5,7 +5,7 @@ Kotlin, plain Views, one dependency (ZXing core, for the QR code). Android TV 9+
 
 ```bash
 ./install.sh                        # first connected device or emulator
-TV=192.168.68.52:5555 ./install.sh  # a TV over ADB Wi-Fi
+TV=192.168.68.61:5555 ./install.sh  # a TV over ADB Wi-Fi
 ```
 
 ## What's on screen

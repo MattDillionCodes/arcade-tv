@@ -10,9 +10,26 @@ import android.graphics.drawable.Drawable
 import kotlin.math.abs
 
 object Apps {
+    /** Settings, the store and TCL's own tools: still listed, just not pinned to Start by default. */
+    private val utilityPackages = setOf(
+        "com.android.tv.settings", "com.android.vending",
+        "com.tcl.suspension", "com.tcl.dashboard", "com.tcl.ui_mediaCenter", "com.tcl.tv",
+    )
+
+    /** Streaming apps most people open most, best first: Start's order until there's launch history. */
+    private val likelyFavourites = listOf(
+        "com.google.android.youtube.tv", "com.netflix.ninja", "com.nuvio.tv",
+        "com.google.android.youtube.tvunplugged", "com.disney.disneyplus", "com.amazon.amazonvideo.livingroom",
+        "com.hulu.livingroomplus", "com.wbd.stream", "com.plexapp.android", "tv.twitch.android.app",
+        "com.spotify.tv.android", "com.google.android.youtube.tvmusic",
+    )
+
     /** Every TV-launchable app except Arcade itself, A to Z. */
     fun load(context: Context): List<App> {
         val pm = context.packageManager
+        // Other home screens (Glass, the stock launcher...) also count as utilities here.
+        val homes = pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), 0)
+            .map { it.activityInfo.packageName }.toSet()
         return pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER), 0)
             .filter { it.activityInfo.packageName != context.packageName }
             .map { ri ->
@@ -20,10 +37,23 @@ object Apps {
                 val icon = ri.loadIcon(pm)
                 val banner = ai.loadBanner(pm) ?: ai.applicationInfo.loadBanner(pm)
                 App(ComponentName(ai.packageName, ai.name), ri.loadLabel(pm).toString(), icon, banner,
-                    Look.of(banner ?: icon, isBanner = banner != null))
+                    Look.of(banner ?: icon, isBanner = banner != null),
+                    isUtility = ai.packageName in utilityPackages || ai.packageName in homes)
             }
             .sortedBy { it.label.lowercase() }
     }
+
+    /**
+     * Apps in the order you're likely to want them: most launched from Arcade first; then, until
+     * there's history to go on, well-known streaming apps; then everything else A to Z, with
+     * utilities last. A launched utility counts like any other app.
+     */
+    fun favourites(apps: List<App>, launches: Map<String, Int>): List<App> =
+        apps.sortedWith(
+            compareByDescending<App> { launches[it.key] ?: 0 }
+                .thenBy { likelyFavourites.indexOf(it.component.packageName).let { i -> if (i < 0) Int.MAX_VALUE else i } }
+                .thenBy { it.isUtility }
+        ) // sortedWith is stable, so ties keep the A-to-Z order
 }
 
 /**

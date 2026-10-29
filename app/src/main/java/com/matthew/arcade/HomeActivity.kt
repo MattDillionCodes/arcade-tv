@@ -23,7 +23,6 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
-import java.io.File
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import kotlin.math.max
@@ -199,9 +198,9 @@ class HomeActivity : Activity(), ControlPanel.Host {
 
     private fun span(units: Int) = dp(units * UNIT + (units - 1) * GAP)
 
-    /** Pinned apps; until the user pins anything, the first eight apps A to Z. */
+    /** Pinned apps; until the user pins or moves anything, your eight most likely favourites. */
     private fun pinned(hero: App?): List<App> {
-        val keys = prefs.pins ?: apps.filter { it.key != hero?.key }.take(8).map { it.key }
+        val keys = prefs.pins ?: Apps.favourites(apps, prefs.launches()).filter { it.key != hero?.key }.take(8).map { it.key }
         return keys.mapNotNull { k -> apps.firstOrNull { it.key == k } }.filter { it.key != hero?.key }
     }
 
@@ -261,7 +260,7 @@ class HomeActivity : Activity(), ControlPanel.Host {
      * mode also darkens the backdrop heavily, as WP 8.1 did, so the tiles read as windows onto it.
      */
     private fun applyTileLook() {
-        val hasPhoto = prefs.wallpaper?.let { File(Wallpapers.dir(this), it).exists() } == true
+        val hasPhoto = prefs.wallpaper != null
         shade.setBackgroundColor(Color.argb(if (prefs.photoTiles) 215 else if (hasPhoto) 90 else 0, 0, 0, 0))
         val photo = if (prefs.photoTiles) wallpaper else null
         for (i in 0 until startGrid.childCount) {
@@ -449,13 +448,12 @@ class HomeActivity : Activity(), ControlPanel.Host {
     override fun wallpaperFromPhone() = openDrop()
 
     override fun nextWallpaper() {
-        val photos = Wallpapers.photos(this)
-        if (photos.isEmpty()) {
+        val names = Wallpapers.names(this)
+        if (names.isEmpty()) {
             showToast("No Photos Yet — Send Some From Your Phone")
             return
         }
-        val i = photos.indexOfFirst { it.name == prefs.wallpaper }
-        useWallpaper(photos[(i + 1) % photos.size].name)
+        useWallpaper(names[(names.indexOf(prefs.wallpaper) + 1) % names.size])
     }
 
     override fun defaultWallpaper() = useWallpaper(null)
@@ -536,6 +534,8 @@ class HomeActivity : Activity(), ControlPanel.Host {
     override fun onStart() {
         super.onStart()
         tick()
+        // Until Start is customised it follows your launches, so refresh it on every return Home.
+        if (prefs.pins == null && ::startGrid.isInitialized) buildStart()
         registerReceiver(clockReceiver, IntentFilter().apply {
             addAction(Intent.ACTION_TIME_TICK)
             addAction(Intent.ACTION_TIME_CHANGED)

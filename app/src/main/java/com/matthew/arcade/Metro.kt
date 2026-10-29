@@ -43,8 +43,19 @@ fun Context.text(s: CharSequence, sp: Float, face: Typeface = Metro.light, color
         includeFontPadding = false
     }
 
-/** One TV-launchable app. [key] is its flattened component name, used everywhere in prefs. */
-class App(val component: ComponentName, val label: String, val icon: Drawable, val banner: Drawable?, val look: Look) {
+/**
+ * One TV-launchable app. [key] is its flattened component name, used everywhere in prefs.
+ * [isUtility] marks settings, stores, TV-maker tools and other home screens: fine in Apps, poor
+ * default tiles on Start.
+ */
+class App(
+    val component: ComponentName,
+    val label: String,
+    val icon: Drawable,
+    val banner: Drawable?,
+    val look: Look,
+    val isUtility: Boolean,
+) {
     val key: String = component.flattenToShortString()
 }
 
