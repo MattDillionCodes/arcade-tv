@@ -38,6 +38,7 @@ class ControlPanel(private val activity: Activity, private val prefs: Prefs, pri
         fun nextWallpaper()
         fun defaultWallpaper()
         fun chooseWeatherCity()
+        fun screensaverChanged()
     }
 
     private val audio = activity.getSystemService(AudioManager::class.java)
@@ -128,6 +129,15 @@ class ControlPanel(private val activity: Activity, private val prefs: Prefs, pri
             section(left, "Inputs")
             left.addView(row(inputs))
         }
+
+        section(left, "Screensaver")
+        left.addView(row(listOf(0, 5, 15, 30).map { m ->
+            chip(if (m == 0) "Off" else "$m Min", "ss:$m", selected = prefs.screensaverMinutes == m, accent) {
+                prefs.screensaverMinutes = m
+                host.screensaverChanged()
+                build()
+            }
+        }))
 
         // Right: how Arcade looks.
         section(right, "Accent Colour")

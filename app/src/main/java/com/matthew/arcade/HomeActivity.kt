@@ -58,6 +58,7 @@ class HomeActivity : Activity(), ControlPanel.Host {
     private lateinit var menu: AppMenu
     private lateinit var drop: WallpaperDrop
     private lateinit var picker: CityPicker
+    private lateinit var lock: LockScreen
     private lateinit var toast: TextView
 
     /** Tag of whatever had focus before an overlay opened, to put focus back afterwards. */
@@ -120,6 +121,7 @@ class HomeActivity : Activity(), ControlPanel.Host {
         drop = WallpaperDrop(this, { prefs.accent }) { file -> useWallpaper(file.name) }
         // The picker closes itself after a pick; focus goes back once it has.
         picker = CityPicker(this, prefs, { prefs.accent }) { weatherCityChanged(); root.post { restoreFocus() } }
+        lock = LockScreen(this)
         toast = text("", 18f, Metro.regular).apply {
             setPadding(dp(48), dp(14), dp(48), dp(14))
             visibility = View.GONE
@@ -142,6 +144,7 @@ class HomeActivity : Activity(), ControlPanel.Host {
             addView(menu.view, FrameLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT, Gravity.BOTTOM))
             addView(drop.view, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
             addView(picker.view, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
+            addView(lock.view, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
             addView(toast, FrameLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT, Gravity.TOP))
             addOnLayoutChangeListener { _, l, t, r, b, ol, ot, or, ob ->
                 if (r - l != or - ol || b - t != ob - ot) loadWallpaper()
@@ -173,7 +176,7 @@ class HomeActivity : Activity(), ControlPanel.Host {
         tiles += utilityTile(Icon.PICTURE, "u:wallpaper") { openDrop() }
         tiles += utilityTile(Icon.INPUT, "u:inputs") { openControls() }
         tiles += utilityTile(Icon.LIST, "u:apps") { firstAppRow()?.requestFocus() }
-        pinned(hero).forEach { tiles += appTile(it, TileSize.MEDIUM) }
+        pinned(hero).forEach { tiles += appTile(it, prefs.tileSize(it.key)) }
         place(tiles)
         applyTileLook()
         val target = focusedTag?.let { startGrid.findViewWithTag<View>(it) } ?: startGrid.getChildAt(0)
@@ -244,6 +247,12 @@ class HomeActivity : Activity(), ControlPanel.Host {
         labelOnFocus = look.background != null || backdrop != null
         art.scaleType = ImageView.ScaleType.FIT_CENTER
         when {
+            // Small tiles are just the app's icon, as on Windows Phone: no room for a banner or name.
+            size == TileSize.SMALL -> {
+                setLabel(null)
+                addView(ImageView(context).apply { setImageDrawable(app.icon) },
+                    0, FrameLayout.LayoutParams(dp(36), dp(36), Gravity.CENTER))
+            }
             backdrop != null -> {
                 // The whole banner, never cropped, over a blurred stretch of itself.
                 addView(ImageView(context).apply {
@@ -382,6 +391,15 @@ class HomeActivity : Activity(), ControlPanel.Host {
         val pins = pinned(hero).map { it.key }.toMutableList()
         val index = pins.indexOf(app.key)
         val items = mutableListOf<MenuItem>()
+        // First, so repeated presses keep cycling: the menu re-opens on the resized tile.
+        if (index >= 0) {
+            val size = prefs.tileSize(app.key)
+            items += MenuItem("Size: ${size.title}") {
+                prefs.setTileSize(app.key, size.next)
+                buildStart()
+                tileMenu(app, startGrid.findViewWithTag("app:${app.key}") ?: from)
+            }
+        }
         if (!isHero) items += MenuItem("Make Hero") {
             // The old hero keeps a place on Start rather than vanishing.
             hero?.let { if (it.key !in pins) pins.add(0, it.key) }
@@ -514,6 +532,25 @@ class HomeActivity : Activity(), ControlPanel.Host {
 
     override fun chooseWeatherCity() = openPicker()
 
+    override fun screensaverChanged() = restartIdle()
+
+    // --- screensaver ---------------------------------------------------------------------------
+
+    /** The key that woke the screensaver: its remaining events are swallowed so it does nothing else. */
+    private var wakeKey = -1
+
+    private val idle = Runnable {
+        // Not over an open screen (the QR code might be waiting for a photo): try again later.
+        if (anyOverlay()) restartIdle() else lock.show(wallpaper, weather, prefs.city)
+    }
+
+    /** Every button press (and every return Home) starts the idle countdown again. */
+    private fun restartIdle() {
+        root.removeCallbacks(idle)
+        val minutes = prefs.screensaverMinutes
+        if (minutes > 0) root.postDelayed(idle, minutes * 60_000L)
+    }
+
     /** New city: relabel the tile and fetch its forecast now, not at the next 15-minute refresh. */
     private fun weatherCityChanged() {
         weatherTile.setPlace(prefs.city)
@@ -556,6 +593,7 @@ class HomeActivity : Activity(), ControlPanel.Host {
     // --- live data -----------------------------------------------------------------------------
 
     private fun tick() {
+        lock.tick()
         val now = LocalDateTime.now()
         clock.text = now.format(DateTimeFormatter.ofPattern("h:mm"))
         greeting.text = when (now.hour) {
@@ -627,11 +665,14 @@ class HomeActivity : Activity(), ControlPanel.Host {
         })
         root.post(refreshWeather)
         root.postDelayed(flipper, 4_000)
+        restartIdle()
     }
 
     override fun onStop() {
         root.removeCallbacks(refreshWeather)
         root.removeCallbacks(flipper)
+        root.removeCallbacks(idle)
+        lock.hide()
         unregisterReceiver(clockReceiver)
         unregisterReceiver(packageReceiver)
         if (drop.isOpen) closeDrop() // never leave the upload server running behind an app
@@ -643,6 +684,8 @@ class HomeActivity : Activity(), ControlPanel.Host {
     /** Home pressed while home: close everything and go back to the hero tile. */
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        lock.hide()
+        restartIdle()
         drop.close()
         picker.close()
         menu.close()
@@ -653,6 +696,20 @@ class HomeActivity : Activity(), ControlPanel.Host {
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        // Any button wakes the screensaver, and only wakes it.
+        if (lock.isShowing) {
+            if (event.action == KeyEvent.ACTION_DOWN) {
+                lock.hide()
+                wakeKey = event.keyCode
+                restartIdle()
+            }
+            return true
+        }
+        if (event.keyCode == wakeKey) {
+            if (event.action == KeyEvent.ACTION_UP) wakeKey = -1
+            return true
+        }
+        if (event.action == KeyEvent.ACTION_DOWN) restartIdle()
         // With nothing open, focus belongs on the home screen. If it's anywhere else (or nowhere),
         // this press only brings the focus ring back, so you never press into the invisible.
         if (event.action == KeyEvent.ACTION_DOWN && !anyOverlay() && !inPanorama(currentFocus)) {

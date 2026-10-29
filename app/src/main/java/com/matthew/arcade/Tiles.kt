@@ -27,7 +27,13 @@ import java.util.Locale
 import kotlin.math.min
 
 /** Tile sizes in grid units, as on Windows Phone: small 1x1, medium 2x2, wide 4x2, large 4x4. */
-enum class TileSize(val cols: Int, val rows: Int) { SMALL(1, 1), MEDIUM(2, 2), WIDE(4, 2), LARGE(4, 4) }
+enum class TileSize(val cols: Int, val rows: Int, val title: String) {
+    SMALL(1, 1, "Small"), MEDIUM(2, 2, "Medium"), WIDE(4, 2, "Wide"), LARGE(4, 4, "Large");
+
+    /** Windows Phone's resize order for app tiles: medium, small, wide, back to medium. */
+    val next: TileSize
+        get() = when (this) { MEDIUM -> SMALL; SMALL -> WIDE; else -> MEDIUM }
+}
 
 /**
  * A Metro tile: a flat square of colour, or (photo mode) a window onto the wallpaper behind

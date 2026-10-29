@@ -21,7 +21,8 @@ TV=192.168.68.61:5555 ./install.sh  # a TV over ADB Wi-Fi
     Press it (or *Weather* in Action Center) to choose your city; Los Angeles until you do.
   - **Clock** (medium, live): time and weekday, then the date.
   - **Small tiles**: Action Center, wallpaper from phone, inputs, all apps.
-  - **Pinned apps** (medium): the first eight A–Z until you pin your own.
+  - **Pinned apps**: your eight likely favourites until you pin your own. Hold OK → *Size* cycles
+    each one through medium, small (icon only) and wide.
 - **Apps**: everything, A to Z, grouped under accent-coloured letter headings like Windows Phone's
   app list.
 
@@ -30,7 +31,7 @@ TV=192.168.68.61:5555 ./install.sh  # a TV over ADB Wi-Fi
 | Button | Does |
 |---|---|
 | Up from the top row, Menu, gamepad Y | Action Center |
-| Hold OK, gamepad X | Options for the focused app: make hero, colour, move, pin/unpin |
+| Hold OK, gamepad X | Options for the focused app: size, make hero, colour, move, pin/unpin |
 | Back | Close whatever is open, or return to the hero tile |
 | Home | Back to the hero tile |
 
@@ -39,7 +40,14 @@ TV=192.168.68.61:5555 ./install.sh  # a TV over ADB Wi-Fi
 Pulls down from the top like Windows Phone 8.1's: quick actions (network, bluetooth, display,
 sound, settings), volume, HDMI inputs (hidden when there are none, e.g. on the emulator),
 accent colour (the 20 Windows Phone accents), tile style (*solid*, or *photo*: the wallpaper
-shows through the tiles, WP 8.1's "show background through tiles"), and wallpaper.
+shows through the tiles, WP 8.1's "show background through tiles"), wallpaper, weather city, and
+the screensaver timer.
+
+## Screensaver
+
+After 5 idle minutes (or 15, 30, or off, in Action Center) Arcade shows a lock screen like Windows
+Phone's: your wallpaper with a big clock, the date and the weather. The text drifts a little every
+minute to avoid burn-in. Any button wakes it, and that press does nothing else.
 
 ## Wallpapers from your phone
 

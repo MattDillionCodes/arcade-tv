@@ -109,6 +109,16 @@ class Prefs(context: Context) {
     fun setTileColor(key: String, color: Int?) =
         sp.edit().apply { if (color == null) remove("color.$key") else putInt("color.$key", color) }.apply()
 
+    /** Idle minutes before the lock-screen screensaver; 0 turns it off. */
+    var screensaverMinutes: Int
+        get() = sp.getInt("screensaverMinutes", 5)
+        set(v) = sp.edit().putInt("screensaverMinutes", v).apply()
+
+    /** A pinned app's tile size; medium until resized. */
+    fun tileSize(key: String): TileSize =
+        sp.getString("size.$key", null)?.let { runCatching { TileSize.valueOf(it) }.getOrNull() } ?: TileSize.MEDIUM
+    fun setTileSize(key: String, size: TileSize) = sp.edit().putString("size.$key", size.name).apply()
+
     fun countLaunch(key: String) = sp.edit().putInt("launches.$key", sp.getInt("launches.$key", 0) + 1).apply()
     fun launches(): Map<String, Int> =
         sp.all.filterKeys { it.startsWith("launches.") }.entries
