@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 320x180 TV banner: one large tile and four small ones, Metro style. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="320dp" android:height="180dp"
+    android:viewportWidth="320" android:viewportHeight="180">
+    <path android:fillColor="#0B0D10" android:pathData="M0,0h320v180h-320z" />
+    <path android:fillColor="#60A917" android:pathData="M88,46h72v88h-72z" />
+    <path android:fillColor="#FFFFFF" android:fillAlpha="0.85" android:pathData="M166,46h30v41h-30z" />
+    <path android:fillColor="#FFFFFF" android:fillAlpha="0.55" android:pathData="M202,46h30v41h-30z" />
+    <path android:fillColor="#FFFFFF" android:fillAlpha="0.35" android:pathData="M166,93h30v41h-30z" />
+    <path android:fillColor="#FFFFFF" android:fillAlpha="0.2" android:pathData="M202,93h30v41h-30z" />
+</vector>
