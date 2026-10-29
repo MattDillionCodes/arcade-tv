@@ -1,15 +1,21 @@
 package com.matthew.arcade
 
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
+import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.BlurMaskFilter
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.LinearGradient
+import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.RectF
+import android.graphics.Shader
 import android.text.TextUtils
 import android.view.Gravity
 import android.view.View
-import android.view.ViewOutlineProvider
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
 import android.widget.FrameLayout
@@ -25,7 +31,9 @@ enum class TileSize(val cols: Int, val rows: Int) { SMALL(1, 1), MEDIUM(2, 2), W
 
 /**
  * A Metro tile: a flat square of colour, or (photo mode) a window onto the wallpaper behind
- * Start. Label bottom-left, a focus ring around it, and the Windows Phone "tilt" when pressed.
+ * Start. Label bottom-left and the Windows Phone "tilt" when pressed. Focus is a spotlight: the
+ * tile lifts, glows in its own colour, and a streak of light sweeps across it once, while the
+ * other tiles on Start dim (see [dimmed]).
  */
 open class Tile(context: Context, val size: TileSize) : FrameLayout(context) {
     var color = Metro.defaultAccent
@@ -42,8 +50,28 @@ open class Tile(context: Context, val size: TileSize) : FrameLayout(context) {
         maxLines = 1
         ellipsize = TextUtils.TruncateAt.END
     }
-    private val ring = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; color = Color.WHITE; strokeWidth = dp(4).toFloat() }
-    private val halo = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; color = Color.argb(140, 0, 0, 0); strokeWidth = dp(2).toFloat() }
+    /** The colour the tile *looks*, when that isn't [color] (e.g. the banner's own background). */
+    var glowTint: Int? = null
+
+    /** Set on every other Start tile while one has focus, so the focused one stands out. */
+    var dimmed = false
+        set(v) {
+            if (v == field) return
+            field = v
+            fade(dimAnim, dim, if (v) 1f else 0f, 220) { dim = it }
+        }
+
+    private var glow = 0f // 0..1, fades in with focus
+    private var dim = 0f // 0..1
+    private var shine = -1f // 0..1 while the light streak crosses the tile, -1 otherwise
+    private val glowAnim = ValueAnimator()
+    private val dimAnim = ValueAnimator()
+    private val shineAnim = ValueAnimator()
+    private val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { maskFilter = BlurMaskFilter(dp(12).toFloat(), BlurMaskFilter.Blur.NORMAL) }
+    private val dimPaint = Paint()
+    private val shinePaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val shineMatrix = Matrix()
+    private var shineBand = 0f
     private val scrim = Paint().apply { color = Color.argb(80, 0, 0, 0) }
     private val bitmapPaint = Paint(Paint.FILTER_BITMAP_FLAG)
     private val loc = IntArray(2)
@@ -54,7 +82,6 @@ open class Tile(context: Context, val size: TileSize) : FrameLayout(context) {
         isClickable = true
         isLongClickable = true
         defaultFocusHighlightEnabled = false
-        outlineProvider = ViewOutlineProvider.BOUNDS // so the lift casts a real shadow
         addView(label, LayoutParams(MATCH_PARENT, WRAP_CONTENT, Gravity.BOTTOM or Gravity.START).apply {
             setMargins(dp(8), 0, dp(8), dp(7))
         })
@@ -100,15 +127,47 @@ open class Tile(context: Context, val size: TileSize) : FrameLayout(context) {
         c.restore()
     }
 
+    /** The glow goes behind the tile, so it's drawn before the tile itself (parents don't clip). */
+    override fun draw(c: Canvas) {
+        if (glow > 0f) {
+            glowPaint.color = glowColor()
+            glowPaint.alpha = (120 * glow).toInt()
+            val g = dp(2).toFloat()
+            c.drawRect(-g, -g, width + g, height + g, glowPaint)
+        }
+        super.draw(c)
+    }
+
+    /** The tile's visible colour; near-black tiles glow white instead, or the glow would vanish. */
+    private fun glowColor(): Int {
+        val base = if (photo != null) Color.WHITE else glowTint ?: color
+        return if (Color.luminance(base) < 0.1f) Color.WHITE else base
+    }
+
     override fun dispatchDraw(c: Canvas) {
         super.dispatchDraw(c)
-        if (isFocused) {
-            // A white ring just outside the tile (parents don't clip), edged with a dark halo so
-            // it reads on any tile colour and any wallpaper, rather than a line inside the art.
-            val r = dp(3) + ring.strokeWidth / 2
-            c.drawRect(-r, -r, width + r, height + r, ring)
-            val h = r + ring.strokeWidth / 2 + halo.strokeWidth / 2
-            c.drawRect(-h, -h, width + h, height + h, halo)
+        val w = width.toFloat()
+        val h = height.toFloat()
+        if (dim > 0f) {
+            dimPaint.color = Color.argb((130 * dim).toInt(), 0, 0, 0)
+            c.drawRect(0f, 0f, w, h, dimPaint)
+        }
+        if (shine >= 0f) {
+            // A soft diagonal band of light, from off the left edge to off the right. One gradient
+            // per tile size, slid across with a matrix, so a sweep allocates nothing per frame.
+            val band = maxOf(w, h) * 0.45f
+            if (band != shineBand) {
+                shineBand = band
+                shinePaint.shader = LinearGradient(0f, 0f, band, band * 0.6f,
+                    intArrayOf(Color.TRANSPARENT, Color.argb(110, 255, 255, 255), Color.TRANSPARENT),
+                    null, Shader.TileMode.CLAMP)
+            }
+            shineMatrix.setTranslate(-band * 2 + (w + band * 3) * shine, 0f)
+            shinePaint.shader.setLocalMatrix(shineMatrix)
+            c.save()
+            c.clipRect(0f, 0f, w, h)
+            c.drawRect(0f, 0f, w, h, shinePaint)
+            c.restore()
         }
     }
 
@@ -116,7 +175,34 @@ open class Tile(context: Context, val size: TileSize) : FrameLayout(context) {
         super.onFocusChanged(gainFocus, direction, previouslyFocusedRect)
         syncLabel()
         settle()
+        fade(glowAnim, glow, if (gainFocus) 1f else 0f, if (gainFocus) 260 else 160) { glow = it }
+        shineAnim.cancel()
+        shine = -1f
+        if (gainFocus) {
+            shineAnim.setFloatValues(0f, 1f)
+            shineAnim.duration = 650
+            shineAnim.startDelay = 90
+            shineAnim.interpolator = Metro.easeOut
+            shineAnim.removeAllUpdateListeners()
+            shineAnim.removeAllListeners()
+            shineAnim.addUpdateListener { shine = it.animatedValue as Float; invalidate() }
+            shineAnim.addListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(a: Animator) { shine = -1f; invalidate() }
+            })
+            shineAnim.start()
+        }
         invalidate()
+    }
+
+    /** Animates one of the 0..1 effect amounts, redrawing as it goes. */
+    private fun fade(anim: ValueAnimator, from: Float, to: Float, ms: Long, set: (Float) -> Unit) {
+        anim.cancel()
+        anim.setFloatValues(from, to)
+        anim.duration = ms
+        anim.interpolator = Metro.easeOut
+        anim.removeAllUpdateListeners()
+        anim.addUpdateListener { set(it.animatedValue as Float); invalidate() }
+        anim.start()
     }
 
     override fun setPressed(pressed: Boolean) {
@@ -125,7 +211,7 @@ open class Tile(context: Context, val size: TileSize) : FrameLayout(context) {
         if (changed) settle()
     }
 
-    /** Focused tiles grow 8% and lift onto a shadow; pressed ones tilt back into the screen. */
+    /** Focused tiles grow 8% and rise above their neighbours; pressed ones tilt back into the screen. */
     private fun settle() {
         val scale = when {
             isPressed -> 0.95f

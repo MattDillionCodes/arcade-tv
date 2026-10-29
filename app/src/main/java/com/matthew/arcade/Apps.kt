@@ -63,8 +63,9 @@ object Apps {
  *  - [backdrop] set: the edges vary (a photo, a gradient), so no one colour can extend them. The
  *    whole banner sits over a soft, stretched-out copy of itself instead: nothing gets cropped.
  *  - neither: the edges are see-through, so the art floats on the tile's accent colour.
+ * [edge] is the banner's average edge colour whenever it's opaque: what the tile glows when focused.
  */
-class Look(val art: Drawable, val isBanner: Boolean, val background: Int?, val backdrop: Bitmap?) {
+class Look(val art: Drawable, val isBanner: Boolean, val background: Int?, val backdrop: Bitmap?, val edge: Int? = background) {
     companion object {
         private const val W = 64
         private const val H = 36
@@ -91,7 +92,7 @@ class Look(val art: Drawable, val isBanner: Boolean, val background: Int?, val b
             val b = opaque.sumOf { Color.blue(it) } / opaque.size
             // Mean distance from the average colour: near 0 for a flat background, large for a photo.
             val spread = opaque.sumOf { abs(Color.red(it) - r) + abs(Color.green(it) - g) + abs(Color.blue(it) - b) } / opaque.size
-            return if (spread > 36) Look(art, isBanner, background = null, backdrop = tiny)
+            return if (spread > 36) Look(art, isBanner, background = null, backdrop = tiny, edge = Color.rgb(r, g, b))
             else Look(art, isBanner, background = Color.rgb(r, g, b), backdrop = null)
         }
     }

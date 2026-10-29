@@ -138,6 +138,7 @@ class HomeActivity : Activity(), ControlPanel.Host {
             }
         }
         setContentView(root)
+        root.viewTreeObserver.addOnGlobalFocusChangeListener { _, now -> spotlight(now) }
         loadApps()
         tick()
     }
@@ -167,6 +168,21 @@ class HomeActivity : Activity(), ControlPanel.Host {
         applyTileLook()
         val target = focusedTag?.let { startGrid.findViewWithTag<View>(it) } ?: startGrid.getChildAt(0)
         if (currentFocus == null || focusedTag != null) target?.requestFocus()
+    }
+
+    /** While a Start tile has focus, every other Start tile dims. */
+    private fun spotlight(focused: View?) {
+        val inStart = focused?.parent === startGrid
+        for (i in 0 until startGrid.childCount) {
+            val tile = startGrid.getChildAt(i) as Tile
+            tile.dimmed = inStart && tile !== focused
+        }
+    }
+
+    // Focus set before the window had it (first launch, returning Home) never fires the listener.
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) spotlight(currentFocus)
     }
 
     /** First fit, column by column, into a [ROWS]-tall grid: how Windows Phone flows its tiles. */
@@ -267,6 +283,7 @@ class HomeActivity : Activity(), ControlPanel.Host {
             val app = tile.app
             val own = app?.let { prefs.tileColor(it.key) ?: it.look.background }
             tile.color = own ?: prefs.accent
+            tile.glowTint = app?.let { prefs.tileColor(it.key) ?: it.look.edge }
             // As on WP 8.1, only accent tiles become windows onto the photo; branded ones keep their colour.
             tile.photo = if (own == null && app?.look?.backdrop == null) photo else null
         }
