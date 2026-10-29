@@ -10,8 +10,9 @@ TV=192.168.68.61:5555 ./install.sh  # a TV over ADB Wi-Fi
 
 ## What's on screen
 
-- **Panorama**: two sections, *Start* and *Apps*, under a time-of-day greeting and the date that
-  scroll at a third of the content's speed. Moving into *Apps* snaps the whole section into view.
+- **Panorama**: two sections, *Start* and *Apps*, that scroll under a time-of-day greeting, the
+  date, the weather and the clock, which all stay put. Moving into *Apps* snaps the whole section
+  into view.
   Every caption is in Title Case.
 - **Start**: tiles flow column by column into a 4-row grid (small 1x1, medium 2x2, wide 4x2,
   large 4x4), Windows Phone style.

@@ -29,8 +29,8 @@ import kotlin.math.max
 
 /**
  * Arcade: a Windows Phone-style Start screen for Android TV. A panorama with two sections, "start"
- * (live tiles, a hero tile, pinned apps) and "apps" (everything, A to Z), under a greeting that
- * scrolls slower than the content.
+ * (live tiles, a hero tile, pinned apps) and "apps" (everything, A to Z), scrolling under a
+ * greeting, date, weather and clock that stay put.
  */
 class HomeActivity : Activity(), ControlPanel.Host {
     private lateinit var prefs: Prefs
@@ -102,9 +102,8 @@ class HomeActivity : Activity(), ControlPanel.Host {
             overScrollMode = View.OVER_SCROLL_NEVER
             clipChildren = false
             addView(content)
-            // The panorama title drifts at a third of the content's speed: Windows Phone's parallax.
-            setOnScrollChangeListener { _, x, _, _, _ ->
-                title.translationX = -x * 0.33f
+            // The greeting stays put like the clock (no parallax); photo tiles redraw as they move.
+            setOnScrollChangeListener { _, _, _, _, _ ->
                 if (prefs.photoTiles) invalidateTiles()
             }
         }
